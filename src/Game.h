@@ -102,17 +102,17 @@ struct debug_read_file_result
 	void *contents;
 };
 
-struct canonical_position{
-#if 1
-	int32 TileMapX;
-	int32 TileMapY;
+struct tile_chunk_position{
+	uint32 TileChunkX;
+	uint32 TileChunkY;
+	
+	uint32 RelTileX;
+	uint32 RelTileY;
+};
 
-	int32 TileX;
-	int32 TileY;
-#else
-	uint32 _TileX;
-	uint32 _TileY;
-#endif
+struct world_position{
+	int32 AbsTileX;
+	int32 AbsTileY;
 
 	real32 TileRelX;
 	real32 TileRelY;
@@ -127,11 +127,15 @@ struct raw_position{
 	real32 Y;
 };
 
-struct tile_map{
+struct tile_chunk{
 	int32* Tiles;
 };
 
 struct world{
+
+	uint32 ChunkShift;
+	uint32 ChunkMask;
+	uint32 ChunkDim;
 
 	real32 TileSideInMeters;
 	real32 TileSideInPixels;
@@ -142,14 +146,14 @@ struct world{
 	real32 UpperLeftX;
 	real32 UpperLeftY;
 
-	int32 TileMapCountX;
-	int32 TileMapCountY;
+	// int32 TileMapCountX;
+	// int32 TileMapCountY;
 
-	tile_map* TileMaps;
+	tile_chunk* TileChunks;
 };
 
 struct game_state {
-	canonical_position PlayerP;
+	world_position PlayerP;
 	world World;
 	//int32_t xoffset;
 	//int32_t yoffset;
