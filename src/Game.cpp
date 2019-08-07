@@ -251,8 +251,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			//	Gray = 0.f;
 			//}
 
-			int32 MinX = CenterX + RelColumn * GameState->World->TileMap->TileSideInPixels - GameState->World->TileMap->TileSideInPixels/2;
-			int32 MinY = CenterY - RelRow * GameState->World->TileMap->TileSideInPixels - GameState->World->TileMap->TileSideInPixels/2;
+			int32 MinX = CenterX + RelColumn * GameState->World->TileMap->TileSideInPixels - GameState->World->TileMap->TileSideInPixels/2 - GameState->PlayerP.TileRelX;
+			int32 MinY = CenterY - RelRow * GameState->World->TileMap->TileSideInPixels - GameState->World->TileMap->TileSideInPixels/2 + GameState->PlayerP.TileRelY;
 			int32 MaxX = MinX + GameState->World->TileMap->TileSideInPixels;
 			int32 MaxY = MinY + GameState->World->TileMap->TileSideInPixels;
 
@@ -260,8 +260,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		}
 	}
 
-	int32 minx = CenterX - PlayerWidth/2 + GameState->PlayerP.TileRelX;
-	int32 miny = CenterY - PlayerHeight/2 - GameState->PlayerP.TileRelY;
+	int32 minx = CenterX - PlayerWidth/2;
+	int32 miny = CenterY - PlayerHeight/2;
 	int32 maxx = minx + PlayerWidth;
 	int32 maxy = miny + PlayerHeight;
 	DrawRectangle(buffer, minx, miny, maxx, maxy, 0.85f, 0.25f, 0.3f);
