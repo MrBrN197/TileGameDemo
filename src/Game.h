@@ -5,6 +5,7 @@ using bool32 = int32_t;
 using uint32 = uint32_t;
 using int32  = int32_t;
 using real32 = float;
+using uint8 = uint8_t;
 
 
 #define internal static
@@ -22,16 +23,9 @@ using real32 = float;
 
 #define ASSERT(X) if(!(X)) { *(int8_t*)0 = 0; }
 
-inline uint32 truncateUint64(uint64_t n)
-{
-	ASSERT(n < 0xFFFFFFFF);
-	return (uint32)n;
-}
 
 //TODO : services that the platform layer provides to the game
 
-
-//NOTE: services that the game provides to the platform layer
 
 struct game_sound_buffer{
 	int16_t *samples;
@@ -102,59 +96,23 @@ struct debug_read_file_result
 	void *contents;
 };
 
-struct tile_chunk_position{
-	uint32 TileChunkX;
-	uint32 TileChunkY;
-	
-	uint32 RelTileX;
-	uint32 RelTileY;
-};
-
-struct world_position{
-	int32 AbsTileX;
-	int32 AbsTileY;
-
-	real32 TileRelX;
-	real32 TileRelY;
-};
-
-
-struct raw_position{
-	int32 TileMapX;
-	int32 TileMapY;
-
-	real32 X;
-	real32 Y;
-};
-
-struct tile_chunk{
-	int32* Tiles;
-};
+#include "GameTile.h"
+#include "GameIntrinsics.h"
 
 struct world{
+	tile_map *TileMap;
+};
 
-	uint32 ChunkShift;
-	uint32 ChunkMask;
-	uint32 ChunkDim;
-
-	real32 TileSideInMeters;
-	real32 TileSideInPixels;
-	
-	int32 CountX;
-	int32 CountY;
-
-	real32 UpperLeftX;
-	real32 UpperLeftY;
-
-	// int32 TileMapCountX;
-	// int32 TileMapCountY;
-
-	tile_chunk* TileChunks;
+struct memory_arena{
+	size_t Size;
+	uint8* Base;
+	size_t Used;
 };
 
 struct game_state {
-	world_position PlayerP;
-	world World;
+	world *World;
+	tile_map_position PlayerP;
+	memory_arena MemoryArena;
 	//int32_t xoffset;
 	//int32_t yoffset;
 	int32_t toneHz;
@@ -181,6 +139,9 @@ struct game_memory
 	bool (*DEBUGPlatformWriteEntireFile)(thread_context *context, char *filename, uint32 size, void *memory);
 };
 
+
+//NOTE: services that the game provides to the platform layer
+
 void* DEBUGPlatformReadEntireFile(thread_context *context, char *filename);
 void DEBUGPlatformFreeFileMemory(thread_context *context, const debug_read_file_result* file);
 bool DEBUGPlatformWriteEntireFile(thread_context *context, char *filename, uint32 size, void *memory);
@@ -192,3 +153,5 @@ typedef GAME_UPDATE_AND_RENDER(game_update_and_render);
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 
 //void FillBuffer(game_back_buffer *back_buffer, int32_t xoffset, int32_t yoffset);
+
+///////////////////////////////////////////////////////////////////////////////////////
