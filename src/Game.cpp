@@ -27,23 +27,6 @@ extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 	//FillSoundBuffer(soundBuffer->samples, soundBuffer->sampleCount);
 }
 
-internal void RenderWierdGradient(game_back_buffer *buffer, int32_t xoffset, int32_t yoffset)
-{
-	uint8_t *row = (uint8_t *)buffer->memory;
-
-	for (int x = 0; x < buffer->height; x++)
-	{
-		uint32_t *pixel = (uint32_t *)row;
-		for (int y = 0; y < buffer->width; y++)
-		{
-			uint8_t green = x + yoffset;
-			uint8_t blue = y + xoffset;
-			*pixel++ = (green << 8) | blue;
-		}
-		row += buffer->pitch;
-	}
-}
-
 internal void BoundValue(int32 &Value, int32 LowerBound, int32 UpperBound){
 	if(Value < LowerBound)
 		Value = LowerBound;
@@ -55,6 +38,9 @@ internal void BoundValue(int32 &Value, int32 LowerBound, int32 UpperBound){
 internal void DrawRectangle(game_back_buffer *buffer, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY, float R, float G, float B)
 {	
 	uint8_t *row = (uint8_t *)buffer->memory;
+
+	ASSERT(MinX < MaxX);
+	ASSERT(MinY < MaxY);
 
 	BoundValue(MinX, 0, buffer->width);
 	BoundValue(MaxX, 0, buffer->width);
@@ -151,7 +137,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			}
 		}
 
-		int32 Offset = 50;
+		int32 Offset = 3;
 
 		SetTileValue(World, Offset, Offset, 0);
 		SetTileValue(World, Offset+2, Offset, 1);
@@ -192,7 +178,17 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			real32 dx = 0.0f;
 			real32 dy = 0.0f;
 
-			int sensitivity = 8;
+			static int32 sensitivity = 1;
+			static int wait = 1;
+			if (wait) {
+				wait--;
+			}
+			if (!wait) {
+				if (controller->actionDown.endedDown){
+					sensitivity += 2;
+					wait = 20;
+				}
+			}
 			if (controller->moveLeft.endedDown)
 				dx -= sensitivity;
 			if (controller->moveRight.endedDown)
@@ -208,8 +204,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 			NewPlayerPos = RecanonicalizePosition(GameState->World, NewPlayerPos);
 
-			char old_buffer[256];
-			char new_buffer[256];
+			// char old_buffer[256];
+			// char new_buffer[256];
 
 			// wsprintfA(old_buffer, "Old: TileMap: (%d, %d) Tile: (%d, %d) TileRel: (%d, %d) \n", GameState->PlayerP.TileMapX, GameState->PlayerP.TileMapY, GameState->PlayerP.TileX,  GameState->PlayerP.TileY, (int32)GameState->PlayerP.TileRelX, (int32)GameState->PlayerP.TileRelY);
 			// wsprintfA(new_buffer, "New: TileMap: (%d, %d) Tile: (%d, %d) TileRel: (%d, %d) \n", NewPlayerPos.TileMapX, NewPlayerPos.TileMapY, NewPlayerPos.TileX,  NewPlayerPos.TileY, (int32)NewPlayerPos.TileRelX, (int32)NewPlayerPos.TileRelY);
@@ -219,54 +215,53 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			// COLLISION
 			tile_map_position LeftEdge = NewPlayerPos;
 			tile_map_position RightEdge = NewPlayerPos;
-			//LeftEdge.TileRelX += PlayerWidth/2;
-			//RightEdge.TileRelX -= PlayerWidth/2;
-			//LeftEdge = RecanonicalizePosition(GameState->World, LeftEdge);
-			//RightEdge = RecanonicalizePosition(GameState->World, RightEdge);
+			LeftEdge.TileRelX += PlayerWidth/2;
+			RightEdge.TileRelX -= PlayerWidth/2;
+			LeftEdge = RecanonicalizePosition(GameState->World, LeftEdge);
+			RightEdge = RecanonicalizePosition(GameState->World, RightEdge);
 
 
-			//if(IsWorldPointEmpty(GameState->World, NewPlayerPos) && IsWorldPointEmpty(GameState->World, NewPlayerPos)){
-			//}
-			GameState->PlayerP = NewPlayerPos;
+			if(IsWorldPointEmpty(GameState->World, LeftEdge) && IsWorldPointEmpty(GameState->World, RightEdge)){
+				GameState->PlayerP = NewPlayerPos;
+			}
 		}
 	}
 
+	tile_map *TileMap = GameState->World->TileMap;
+	tile_map_position PlayerP = GameState->PlayerP;
 
-	real32 CenterX = buffer->width/2;
-	real32 CenterY = buffer->height/2;
+	real32 CenterX = buffer->width/2.f;
+	real32 CenterY = buffer->height/2.f;
 	DrawRectangle(buffer, 0.f, 0.f, buffer->width, buffer->height, 0.2f, 0.3f, 0.8f);
 	for (int32 RelRow = -10; RelRow < 10; RelRow++)
 	{
 		for (int32 RelColumn = -19; RelColumn < 19; RelColumn++)
 		{
 			real32 Gray = 0.25f;
-			int32 Column = GameState->PlayerP.AbsTileX + RelColumn;
-			int32 Row = GameState->PlayerP.AbsTileY + RelRow;
 
-			uint32 TileValue = GetTileValue(GameState->World, Column, Row);
+			uint32 AbsColumn = PlayerP.AbsTileX + RelColumn;
+			uint32 AbsRow = PlayerP.AbsTileY + RelRow;
+
+			uint32 TileValue = GetTileValue(GameState->World, AbsColumn, AbsRow);
 			if (TileValue == 1)
 				Gray = 1.0f;
 
-			//if((Column == GameState->PlayerP.AbsTileX) && (Row == GameState->PlayerP.AbsTileY)){
-			//	Gray = 0.f;
-			//}
+			if((AbsColumn == PlayerP.AbsTileX) && (AbsRow == PlayerP.AbsTileY))
+				Gray = 0.f;
 
-			int32 MinX = CenterX + RelColumn * GameState->World->TileMap->TileSideInPixels - GameState->World->TileMap->TileSideInPixels/2 - GameState->PlayerP.TileRelX;
-			int32 MinY = CenterY - RelRow * GameState->World->TileMap->TileSideInPixels - GameState->World->TileMap->TileSideInPixels/2 + GameState->PlayerP.TileRelY;
-			int32 MaxX = MinX + GameState->World->TileMap->TileSideInPixels;
-			int32 MaxY = MinY + GameState->World->TileMap->TileSideInPixels;
-
+			int32 MinX = CenterX + (RelColumn * TileMap->TileSideInPixels) - PlayerP.TileRelX;
+			int32 MaxY = CenterY - (RelRow * TileMap->TileSideInPixels) + PlayerP.TileRelY;
+			int32 MaxX = MinX + TileMap->TileSideInPixels;
+			int32 MinY = MaxY - TileMap->TileSideInPixels;
 			DrawRectangle(buffer, MinX, MinY, MaxX, MaxY, Gray, Gray, Gray);
 		}
 	}
 
 	int32 minx = CenterX - PlayerWidth/2;
-	int32 miny = CenterY - PlayerHeight/2;
+	int32 miny = CenterY - PlayerHeight;
 	int32 maxx = minx + PlayerWidth;
 	int32 maxy = miny + PlayerHeight;
 	DrawRectangle(buffer, minx, miny, maxx, maxy, 0.85f, 0.25f, 0.3f);
-	//DrawRectangle(buffer, GameState->World->TileMap->ChunkDim * GameState->World->TileMap->TileSideInPixels, 0, 1280, 720, 0.f, 8.f, 0.f);
-	//DrawRectangle(buffer, 0, GameState->World->TileMap->ChunkDim * GameState->World->TileMap->TileSideInPixels, 1280, 720, 0.f, 8.f, 0.f);
 	DrawRectangle(buffer, 0, buffer->height/2, buffer->width, buffer->height/2+1, 0.8f, 0.2, 0.3f);
 	DrawRectangle(buffer, buffer->width/2, 0, buffer->width/2+1, buffer->height, 0.8f, 0.2, 0.3f);
 

@@ -31,14 +31,13 @@ RecanonicalizePosition(world *World, tile_map_position Pos)
 }
 
 inline tile_chunk*
-GetTileChunk(world *World, int32 TileChunkX, int32 TileChunkY)
+GetTileChunk(world *World, uint32 TileChunkX, uint32 TileChunkY)
 {
-	ASSERT(TileChunkX >= 0);
-	ASSERT(TileChunkY >= 0);
-	ASSERT(TileChunkX < World->TileMap->TileChunkCountX);
-	ASSERT(TileChunkY < World->TileMap->TileChunkCountY);
+	tile_chunk *TileChunk = nullptr;
 
-	tile_chunk *TileChunk = &World->TileMap->TileChunks[TileChunkY * World->TileMap->TileChunkCountX + TileChunkX];
+	if((TileChunkY < World->TileMap->TileChunkCountY) && (TileChunkX < World->TileMap->TileChunkCountX))
+		TileChunk = &World->TileMap->TileChunks[TileChunkY * World->TileMap->TileChunkCountX + TileChunkX];
+
 	return TileChunk;
 }
 
