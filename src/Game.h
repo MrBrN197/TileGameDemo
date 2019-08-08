@@ -139,6 +139,16 @@ struct game_memory
 	bool (*DEBUGPlatformWriteEntireFile)(thread_context *context, char *filename, uint32 size, void *memory);
 };
 
+#define PushStruct(arena, type) (type*)PushStruct_(arena, sizeof(type))
+#define PushArray(arena, count, type) (type*)PushStruct_(arena, sizeof(type) * count)
+inline void*
+PushStruct_(memory_arena &Arena, size_t Size){
+	ASSERT(Arena.Used + Size <= Arena.Size);
+	Arena.Used += Size;
+	void* Result = (Arena.Base + Size);
+	return Result;
+}
+
 
 //NOTE: services that the game provides to the platform layer
 

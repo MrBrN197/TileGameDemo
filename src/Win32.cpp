@@ -554,6 +554,9 @@ static void Win32ProcessPendingMessages(game_controller_input *keyboardControlle
 				if(VKCode == 'D'){
 					Win32ProcessKeyboardMessage(&keyboardController->moveRight, isDown);
 				}
+				if(VKCode == VK_SPACE){
+					Win32ProcessKeyboardMessage(&keyboardController->actionDown, isDown);
+				}
 				if(VKCode == 'L'){
 					if(isDown){
 						OutputDebugStringA("L\n");
