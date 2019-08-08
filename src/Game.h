@@ -3,7 +3,9 @@
 
 using bool32 = int32_t;
 using uint32 = uint32_t;
+using uint16 = uint16_t;
 using int32  = int32_t;
+using int16 = int16_t;
 using real32 = float;
 using uint8 = uint8_t;
 
@@ -22,9 +24,6 @@ using uint8 = uint8_t;
 // TODO: swap, min, max ... macros???
 
 #define ASSERT(X) if(!(X)) { *(int8_t*)0 = 0; }
-
-
-//TODO : services that the platform layer provides to the game
 
 
 struct game_sound_buffer{
@@ -113,6 +112,7 @@ struct game_state {
 	world *World;
 	tile_map_position PlayerP;
 	memory_arena MemoryArena;
+	uint32 *BMPPixels;
 	//int32_t xoffset;
 	//int32_t yoffset;
 	int32_t toneHz;
@@ -125,6 +125,12 @@ struct thread_context{
 	int placeholder;
 };
 
+//TODO : services that the platform layer provides to the game
+
+typedef debug_read_file_result debug_platform_read_entire_file(thread_context *Thread, const char *filename);
+typedef void debug_platform_free_file_memory(thread_context *Thread, const debug_read_file_result* fileInfo);
+typedef bool debug_platform_write_entire_file(thread_context *Thread, char *filename, uint32 size, void *memory);
+
 struct game_memory
 {
 	bool isInitialized;
@@ -134,9 +140,9 @@ struct game_memory
 	size_t transientStorageSize;
 	void *transientStorage;
 
-	void* (*DEBUGPlatformReadEntireFile)(thread_context *context, char *filename);
-	void (*DEBUGPlatformFreeFileMemory)(thread_context *context, const debug_read_file_result* fileInfo);
-	bool (*DEBUGPlatformWriteEntireFile)(thread_context *context, char *filename, uint32 size, void *memory);
+	debug_platform_read_entire_file *DEBUGPlatformReadEntireFile;
+	debug_platform_free_file_memory *DEBUGPlatformFreeFileMemory;
+	debug_platform_write_entire_file *DEBUGPlatformWriteEntireFile;
 };
 
 #define PushStruct(arena, type) (type*)PushStruct_(arena, sizeof(type))
@@ -152,14 +158,14 @@ PushStruct_(memory_arena &Arena, size_t Size){
 
 //NOTE: services that the game provides to the platform layer
 
-void* DEBUGPlatformReadEntireFile(thread_context *context, char *filename);
-void DEBUGPlatformFreeFileMemory(thread_context *context, const debug_read_file_result* file);
-bool DEBUGPlatformWriteEntireFile(thread_context *context, char *filename, uint32 size, void *memory);
+// void* DEBUGPlatformReadEntireFile(thread_context *Thread, char *filename);
+// void DEBUGPlatformFreeFileMemory(thread_context *Thread, const debug_read_file_result* file);
+// bool DEBUGPlatformWriteEntireFile(thread_context *Thread, char *filename, uint32 size, void *memory);
 
-#define GAME_UPDATE_AND_RENDER(name) void name(game_memory *memory, game_input *input, game_back_buffer *buffer)
+#define GAME_UPDATE_AND_RENDER(name) void name(thread_context *Thread, game_memory *memory, game_input *input, game_back_buffer *buffer)
 typedef GAME_UPDATE_AND_RENDER(game_update_and_render);
 
-#define GAME_GET_SOUND_SAMPLES(name) void name(game_memory *memory, game_sound_buffer *soundBuffer)
+#define GAME_GET_SOUND_SAMPLES(name) void name(thread_context *Thread, game_memory *memory, game_sound_buffer *soundBuffer)
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 
 //void FillBuffer(game_back_buffer *back_buffer, int32_t xoffset, int32_t yoffset);

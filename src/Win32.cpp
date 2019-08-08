@@ -55,10 +55,13 @@ global_variable win32_buffer globalBuffer;
 global_variable LPDIRECTSOUNDBUFFER globalSoundBuffer;
 global_variable LARGE_INTEGER globalPerfCountFrequency;
 
-void* DEBUGPlatformReadEntireFile(thread_context *Context, char *filename){
+debug_read_file_result DEBUGPlatformReadEntireFile(thread_context *Context, const char *filename){
 	HANDLE handle = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
 
-	void *result = 0;
+	ASSERT(handle != INVALID_HANDLE_VALUE);
+
+	debug_read_file_result Result = {};
+	void *content = nullptr;
 
 	if (handle != INVALID_HANDLE_VALUE) {
 
@@ -66,21 +69,37 @@ void* DEBUGPlatformReadEntireFile(thread_context *Context, char *filename){
 
 		if (GetFileSizeEx(handle, &fileSize)) {
 			DWORD bytesRead;
-			result = VirtualAlloc(NULL, fileSize.QuadPart, MEM_RESERVE | MEM_RESERVE, PAGE_READONLY);
+			content = VirtualAlloc(NULL, fileSize.QuadPart, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+			// content = (void*)new uint8[fileSize.QuadPart];
+			// memset(content, 0, fileSize.QuadPart);
+
+			ASSERT(content);
 
 			DWORD size = truncateUint64(fileSize.QuadPart);
 
-			if (ReadFile(handle, result, size, &bytesRead, NULL)) {
+			if (ReadFile(handle, content, size, &bytesRead, NULL)) {
 				ASSERT(size == bytesRead)
-			}
-			else {
-				result = 0;
+				Result.contents = content;
+				Result.size = bytesRead;
+			}else{
+				uint32 Error = GetLastError();
+				char messageBuffer[512];
+				
+				int success = FormatMessage( 
+					FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+					NULL,
+					Error,
+					MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+					(LPTSTR) &messageBuffer,
+					512, NULL );
+
+				OutputDebugString(messageBuffer);
 			}
 		}
 		CloseHandle(handle);
 	}
-
-	return result;
+	ASSERT(content);
+	return Result;
 }
 void DEBUGPlatformFreeFileMemory(thread_context *Context, const debug_read_file_result* file_info){
 
@@ -888,10 +907,10 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 			Win32PlaybackInput(&win32State, newInput);
 		}
 		if (GameCode.UpdateAndRender){
-			GameCode.UpdateAndRender(&gameMemory, newInput, &back_buffer);
+			GameCode.UpdateAndRender(nullptr, &gameMemory, newInput, &back_buffer);
 		}
 		if (GameCode.GetSoundSamples){
-			//GameCode.GetSoundSamples(&gameMemory, &sound_buffer);
+			//GameCode.GetSoundSamples(nullptr, &gameMemory, &sound_buffer);
 		}	
 		Win32DebugSyncDisplay(&globalBuffer, samples, sound.samplesPerSecond * 3);
 		//Win32FillSoundBuffer(&sound, byteToLock, bytesToWrite, &sound_buffer);

@@ -73,6 +73,31 @@ InitializeMemoryArena(memory_arena &Arena, size_t Size, void* PermanentStorage){
 	Arena.Used = 0;
 }
 
+#pragma pack(push, 1)
+struct bitmap_header {
+  uint16  bfType;
+  uint32 bfSize;
+  uint16  bfReserved1;
+  uint16  bfReserved2;
+  uint32 bfOffBits;
+};
+#pragma pack(pop, 1)
+
+inline uint32*
+DEBUGLoadBMP(thread_context *Thread, debug_platform_read_entire_file *ReadEntireFile, const char* path){
+
+	uint32* Pixels = nullptr;
+	debug_read_file_result FileContents;
+
+	FileContents = ReadEntireFile(Thread, path);
+	if(FileContents.contents){
+		bitmap_header header = *(bitmap_header*)FileContents.contents;
+		Pixels = (uint32*)((uint8*)FileContents.contents + header.bfOffBits);
+	}
+
+	return Pixels;
+}
+
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
 
@@ -90,6 +115,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		world *World = GameState->World;
 		tile_map *TileMap = PushStruct(GameState->MemoryArena, tile_map);
 		World->TileMap = TileMap;
+		GameState->BMPPixels = DEBUGLoadBMP(Thread, memory->DEBUGPlatformReadEntireFile, "./test.bmp");
 
 		TileMap->ChunkShift = 8;
 		// TODO: Generate ChunkDim And ChunkMask From ChunkShift
@@ -100,7 +126,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		TileMap->TileChunkCountY = 4;
 		TileMap->TileChunkCountZ = 4;
 
-		TileMap->TileSideInPixels = 10;
+		TileMap->TileSideInPixels = 60;
 		TileMap->TileSideInMeters = 1.4f;
 		TileMap->MetersToPixels = TileMap->TileSideInPixels/TileMap->TileSideInMeters;
 
@@ -178,7 +204,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			}
 			if (!wait) {
 				if (controller->actionDown.endedDown){
-					sensitivity *= 2;
+					sensitivity += 0.1;
 					wait = 20;
 				}
 			}
@@ -252,5 +278,19 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	DrawRectangle(buffer, minx, miny, maxx, maxy, 0.85f, 0.25f, 0.3f);
 	DrawRectangle(buffer, 0, buffer->height/2, buffer->width, buffer->height/2+1, 0.8f, 0.2, 0.3f);
 	DrawRectangle(buffer, buffer->width/2, 0, buffer->width/2+1, buffer->height, 0.8f, 0.2, 0.3f);
+
+
+	uint32* src = GameState->BMPPixels;
+	uint32* dst = (uint32*)buffer->memory;
+
+	uint32 width = 512;
+	uint32 height = 256;
+
+	for(int row = 0; row < height; row++){
+		for(int column = 0; column < width; column++){
+			*dst++ = *src++;
+		}
+		dst += (buffer->width - width); 
+	}
 
 }
