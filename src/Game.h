@@ -108,11 +108,17 @@ struct memory_arena{
 	size_t Used;
 };
 
+struct bitmap_image{
+	uint32 *Pixels;
+	uint32 Width;
+	uint32 Height;
+};
+
 struct game_state {
 	world *World;
 	tile_map_position PlayerP;
 	memory_arena MemoryArena;
-	uint32 *BMPPixels;
+	bitmap_image BMPPixels;
 	//int32_t xoffset;
 	//int32_t yoffset;
 	int32_t toneHz;

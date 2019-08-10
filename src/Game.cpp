@@ -65,6 +65,40 @@ internal void DrawRectangle(game_back_buffer *buffer, int32 MinX, int32 MinY, in
 	}
 }
 
+internal void DrawBitmap(game_back_buffer *buffer, const bitmap_image *Image, real32 X, real32 Y)
+{	
+	ASSERT(X <= buffer->width);
+	ASSERT(Y <= buffer->height);
+
+	uint32* src = Image->Pixels;
+	uint32* dst = (uint32*)buffer->memory;
+
+	// flooring float value to int
+	uint32 xoffset = (uint32)(X + 0.5f);
+	uint32 yoffset = (uint32)(Y + 0.5f);
+
+	uint32 width = (Image->Width < buffer->width - X) ? Image->Width : buffer->width - X;
+	uint32 height = (Image->Height < buffer->height - Y) ? Image->Height : buffer->height - Y;
+
+	dst += (buffer->width * yoffset) + xoffset;
+	src += Image->Width * (Image->Height - 1);
+
+	for(int y = 0; y < height; y++){
+		for(int x = 0; x < width; x++){
+			uint32 Foreground = *src;
+			uint32 Background = *dst;
+			real32 Alpha = (real32)(Foreground >> 24) / 255.f;  // value between 0 - 1
+			uint8 R = (1-Alpha) * (uint8)(Background >> 16) + Alpha * (uint8)(Foreground >> 16);
+			uint8 G = (1-Alpha) * (uint8)(Background >>  8) + Alpha * (uint8)(Foreground >>  8);
+			uint8 B = (1-Alpha) * (uint8)(Background >>  0) + Alpha * (uint8)(Foreground >>  0);
+
+			*dst++ = (255 << 24) | (R << 16) | (G << 8) | (B << 0);
+			*src++;
+		}
+		dst += (buffer->width - width);
+		src -= (width + Image->Width);
+	}
+}
 
 inline void
 InitializeMemoryArena(memory_arena &Arena, size_t Size, void* PermanentStorage){
@@ -81,21 +115,42 @@ struct bitmap_header {
   uint16  bfReserved2;
   uint32 bfOffBits;
 };
+
+struct bitmap_info_header {
+  	uint32 biSize;
+  	int32  biWidth;
+  	int32  biHeight;
+  	uint16  biPlanes;
+  	uint16  biBitCount;
+  	uint32 biCompression;
+  	uint32 biSizeImage;
+  	int32  biXPelsPerMeter;
+  	int32  biYPelsPerMeter;
+  	uint32 biClrUsed;
+  	uint32 biClrImportant;
+  	uint32 RedMask;         /* Mask identifying bits of red component */
+  	uint32 GreenMask;       /* Mask identifying bits of green component */
+  	uint32 BlueMask;        /* Mask identifying bits of green component */
+};
 #pragma pack(pop, 1)
 
-inline uint32*
+inline bitmap_image
 DEBUGLoadBMP(thread_context *Thread, debug_platform_read_entire_file *ReadEntireFile, const char* path){
 
-	uint32* Pixels = nullptr;
+	bitmap_image Result;
 	debug_read_file_result FileContents;
 
 	FileContents = ReadEntireFile(Thread, path);
+	ASSERT(FileContents.contents);
 	if(FileContents.contents){
 		bitmap_header header = *(bitmap_header*)FileContents.contents;
-		Pixels = (uint32*)((uint8*)FileContents.contents + header.bfOffBits);
+		bitmap_info_header info_header = *(bitmap_info_header*)((bitmap_header*)FileContents.contents+1);
+		Result.Width = info_header.biWidth;
+		Result.Height = info_header.biHeight;
+		Result.Pixels = (uint32*)((uint8*)FileContents.contents + header.bfOffBits);
 	}
 
-	return Pixels;
+	return Result;
 }
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
@@ -115,7 +170,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		world *World = GameState->World;
 		tile_map *TileMap = PushStruct(GameState->MemoryArena, tile_map);
 		World->TileMap = TileMap;
-		GameState->BMPPixels = DEBUGLoadBMP(Thread, memory->DEBUGPlatformReadEntireFile, "./test.bmp");
+		GameState->BMPPixels = DEBUGLoadBMP(Thread, memory->DEBUGPlatformReadEntireFile, "./circle.bmp");
 
 		TileMap->ChunkShift = 8;
 		// TODO: Generate ChunkDim And ChunkMask From ChunkShift
@@ -280,17 +335,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	DrawRectangle(buffer, buffer->width/2, 0, buffer->width/2+1, buffer->height, 0.8f, 0.2, 0.3f);
 
 
-	uint32* src = GameState->BMPPixels;
-	uint32* dst = (uint32*)buffer->memory;
-
-	uint32 width = 512;
-	uint32 height = 256;
-
-	for(int row = 0; row < height; row++){
-		for(int column = 0; column < width; column++){
-			*dst++ = *src++;
-		}
-		dst += (buffer->width - width); 
-	}
+	DrawBitmap(buffer, &GameState->BMPPixels, buffer->width/2.f - GameState->BMPPixels.Width/2, buffer->height/2.f - GameState->BMPPixels.Height/2);
 
 }
