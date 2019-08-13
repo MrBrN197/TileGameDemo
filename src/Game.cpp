@@ -233,6 +233,11 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		GameState->PlayerP.TileRelX = 0.f;
 		GameState->PlayerP.TileRelY = 0.f;
 
+		GameState->CameraP.AbsTileX = 3;
+		GameState->CameraP.AbsTileY = 3;
+		GameState->CameraP.TileRelX = 0.f;
+		GameState->CameraP.TileRelY = 0.f;
+
 		memory->isInitialized = true;
 	}
 
@@ -289,6 +294,17 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 
 			if(IsWorldPointEmpty(GameState->World->TileMap, LeftEdge) && IsWorldPointEmpty(GameState->World->TileMap, RightEdge)){
+				tile_map *TileMap = GameState->World->TileMap;
+				tile_map_position CameraP = GameState->CameraP;
+				if((NewPlayerPos.AbsTileX  * TileMap->TileSideInPixels + NewPlayerPos.TileRelX) - (CameraP.AbsTileX * TileMap->TileSideInPixels + CameraP.TileRelX) > buffer->width/2)
+					GameState->CameraP.AbsTileX += 9;
+				if((NewPlayerPos.AbsTileX  * TileMap->TileSideInPixels + NewPlayerPos.TileRelX) - (CameraP.AbsTileX * TileMap->TileSideInPixels + CameraP.TileRelX) < -buffer->width/2)
+					GameState->CameraP.AbsTileX -= 9;
+				if((NewPlayerPos.AbsTileY  * TileMap->TileSideInPixels + NewPlayerPos.TileRelY) - (CameraP.AbsTileY * TileMap->TileSideInPixels + CameraP.TileRelY) > buffer->height/2)
+					GameState->CameraP.AbsTileY += 7;
+				if((NewPlayerPos.AbsTileY  * TileMap->TileSideInPixels + NewPlayerPos.TileRelY) - (CameraP.AbsTileY * TileMap->TileSideInPixels + CameraP.TileRelY) < -buffer->height/2)
+					GameState->CameraP.AbsTileY -= 7;
+
 				GameState->PlayerP = NewPlayerPos;
 			}
 		}
@@ -296,6 +312,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	tile_map *TileMap = GameState->World->TileMap;
 	tile_map_position PlayerP = GameState->PlayerP;
+	tile_map_position CameraP = GameState->CameraP;
 
 	real32 CenterX = buffer->width/2.f;
 	real32 CenterY = buffer->height/2.f;
@@ -306,19 +323,19 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		{
 			real32 Gray = 0.25f;
 
-			uint32 AbsColumn = PlayerP.AbsTileX + RelColumn;
-			uint32 AbsRow = PlayerP.AbsTileY + RelRow;
+			uint32 AbsColumn = CameraP.AbsTileX + RelColumn;
+			uint32 AbsRow = CameraP.AbsTileY + RelRow;
 
 			uint32 TileValue = GetTileValue(GameState->World->TileMap, AbsColumn, AbsRow, 0);
 			if(TileValue > 0){
 				if (TileValue == 2)
 					Gray = 1.0f;
 
-				if((AbsColumn == PlayerP.AbsTileX) && (AbsRow == PlayerP.AbsTileY))
+				if((AbsColumn == CameraP.AbsTileX) && (AbsRow == CameraP.AbsTileY))
 					Gray = 0.f;
 
-				int32 MinX = CenterX + (RelColumn * TileMap->TileSideInPixels) - PlayerP.TileRelX * TileMap->MetersToPixels;
-				int32 MaxY = CenterY - (RelRow * TileMap->TileSideInPixels) + PlayerP.TileRelY * TileMap->MetersToPixels;
+				int32 MinX = CenterX + (RelColumn * TileMap->TileSideInPixels) - CameraP.TileRelX * TileMap->MetersToPixels;
+				int32 MaxY = CenterY - (RelRow * TileMap->TileSideInPixels) + CameraP.TileRelY * TileMap->MetersToPixels;
 				int32 MaxX = MinX + TileMap->TileSideInPixels;
 				int32 MinY = MaxY - TileMap->TileSideInPixels;
 				DrawRectangle(buffer, MinX, MinY, MaxX, MaxY, Gray, Gray, Gray);
@@ -326,15 +343,22 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		}
 	}
 
-	int32 minx = CenterX - PlayerWidth/2 * TileMap->MetersToPixels;
-	int32 miny = CenterY - PlayerHeight * TileMap->MetersToPixels;
+	tile_map_position PlayerCameraRelPosition = {};
+	PlayerCameraRelPosition.AbsTileX = PlayerP.AbsTileX - CameraP.AbsTileX;
+	PlayerCameraRelPosition.AbsTileY = PlayerP.AbsTileY - CameraP.AbsTileY;
+	PlayerCameraRelPosition.TileRelX = PlayerP.TileRelX - CameraP.TileRelX;
+	PlayerCameraRelPosition.TileRelY = PlayerP.TileRelY - CameraP.TileRelY;
+	PlayerCameraRelPosition = RecanonicalizePosition(TileMap, PlayerCameraRelPosition);
+
+	int32 minx = CenterX + (PlayerCameraRelPosition.AbsTileX * TileMap->TileSideInMeters + PlayerCameraRelPosition.TileRelX - PlayerWidth/2) * TileMap->MetersToPixels;
+	int32 maxy = CenterY - (PlayerCameraRelPosition.AbsTileY * TileMap->TileSideInMeters + PlayerCameraRelPosition.TileRelY) * TileMap->MetersToPixels;
 	int32 maxx = minx + PlayerWidth * TileMap->MetersToPixels;
-	int32 maxy = miny + PlayerHeight * TileMap->MetersToPixels;
+	int32 miny = maxy - PlayerHeight * TileMap->MetersToPixels;
 	DrawRectangle(buffer, minx, miny, maxx, maxy, 0.85f, 0.25f, 0.3f);
 	DrawRectangle(buffer, 0, buffer->height/2, buffer->width, buffer->height/2+1, 0.8f, 0.2, 0.3f);
 	DrawRectangle(buffer, buffer->width/2, 0, buffer->width/2+1, buffer->height, 0.8f, 0.2, 0.3f);
 
 
-	DrawBitmap(buffer, &GameState->BMPPixels, buffer->width/2.f - GameState->BMPPixels.Width/2, buffer->height/2.f - GameState->BMPPixels.Height/2);
+	// DrawBitmap(buffer, &GameState->BMPPixels, buffer->width/2.f - GameState->BMPPixels.Width/2, buffer->height/2.f - GameState->BMPPixels.Height/2);
 
 }

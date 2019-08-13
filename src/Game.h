@@ -116,6 +116,7 @@ struct bitmap_image{
 
 struct game_state {
 	world *World;
+	tile_map_position CameraP;
 	tile_map_position PlayerP;
 	memory_arena MemoryArena;
 	bitmap_image BMPPixels;
