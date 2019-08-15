@@ -315,7 +315,20 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			if(!Collided){
 				GameState->PlayerP = NewPlayerPos;
 			}else{
-				GameState->PlayerVel = {0, 0};
+				vec2 Normal = {0, 0};
+				if(CollisionDirection.AbsTileX < GameState->PlayerP.AbsTileX){
+					Normal = {1, 0};
+				}if(CollisionDirection.AbsTileX > GameState->PlayerP.AbsTileX){
+					Normal = {-1, 0};
+				}
+				if(CollisionDirection.AbsTileY < GameState->PlayerP.AbsTileY){
+					Normal = {0, 1};
+				}
+				if(CollisionDirection.AbsTileY > GameState->PlayerP.AbsTileY){
+					Normal = {0, -1};
+				}
+				ASSERT(!((Normal.x == 0) && (Normal.y == 0)));
+				GameState->PlayerVel = GameState->PlayerVel - (2 * dot(GameState->PlayerVel, Normal)) * Normal;  // V + (2*(N*V))*N
 			}
 		}
 	}
@@ -341,8 +354,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				if (TileValue == 2)
 					Gray = 1.0f;
 
-				if((AbsColumn == CameraP.AbsTileX) && (AbsRow == CameraP.AbsTileY))
-					Gray = 0.f;
+				//if((AbsColumn == CameraP.AbsTileX) && (AbsRow == CameraP.AbsTileY))
+				//	Gray = 0.f;
 
 				int32 MinX = CenterX + (RelColumn * TileMap->TileSideInPixels) - CameraP.Offset.x * TileMap->MetersToPixels;
 				int32 MaxY = CenterY - (RelRow * TileMap->TileSideInPixels) + CameraP.Offset.y * TileMap->MetersToPixels;
