@@ -54,6 +54,29 @@ global_variable bool Running;
 global_variable win32_buffer globalBuffer;
 global_variable LPDIRECTSOUNDBUFFER globalSoundBuffer;
 global_variable LARGE_INTEGER globalPerfCountFrequency;
+global_variable WINDOWPLACEMENT WindowPosition = { sizeof(WindowPosition) };
+
+void ToggleFullScreen(HWND windowHandle)
+{
+ 	DWORD Style = GetWindowLong(windowHandle, GWL_STYLE);
+ 	if (Style & WS_OVERLAPPEDWINDOW) {
+    	MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
+    	if (GetWindowPlacement(windowHandle, &WindowPosition) && GetMonitorInfo(MonitorFromWindow(windowHandle, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo)) {
+     		SetWindowLong(windowHandle, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
+     		SetWindowPos(windowHandle, HWND_TOP,
+                   MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
+                   MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                   MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                   SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    	}
+ 	} else{
+    	SetWindowLong(windowHandle, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+    	SetWindowPlacement(windowHandle, &WindowPosition);
+    	SetWindowPos(windowHandle, NULL, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+  	}
+}
 
 debug_read_file_result DEBUGPlatformReadEntireFile(thread_context *Context, const char *filename){
 	HANDLE handle = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
@@ -184,7 +207,7 @@ inline float GetSecondsElapsed(LARGE_INTEGER start, LARGE_INTEGER end) {
 	return result;
 }
 
-LRESULT CALLBACK Win32MainWindowCallback(HWND windowHandle,UINT   message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK Win32MainWindowCallback(HWND windowHandle, UINT message, WPARAM wParam, LPARAM lParam) {
 	LRESULT result = 0;
 	
 	switch (message) {
@@ -598,6 +621,12 @@ static void Win32ProcessPendingMessages(game_controller_input *keyboardControlle
 						}
 					}
 				}
+				bool AltKeyWasDown = (message.lParam & (1 << 29));
+				if((VKCode == VK_RETURN) && (AltKeyWasDown)){
+					if(isDown){
+						ToggleFullScreen(message.hwnd);
+					}
+				}
 			}
 		}
 		break;
@@ -689,6 +718,7 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	windowClass.hInstance = hInstance;
 	windowClass.style = /*CS_OWNDC|*/ CS_HREDRAW | CS_VREDRAW;
 	windowClass.lpszClassName = "TileGameDemoClass";
+	windowClass.hCursor = LoadCursor(0, IDC_CROSS);
 
 	ATOM status  = RegisterClassA(&windowClass);
 	ASSERT(status);
@@ -925,10 +955,10 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 				elapsed = GetSecondsElapsed(lastCounter, Win32GetWallClock());
 			}
 		lastCounter = Win32GetWallClock();
-
-		//char timing[512];
-		//sprintf(timing, "%.6f s", elapsed);
-		//OutputDebugStringA(timing);
+		newInput->dt = elapsed;
+		char timing[512];
+		sprintf(timing, "%.6f s\n", elapsed);
+		OutputDebugStringA(timing);
 
 		//Update Display
 		HDC context = GetDC(windowHandle);

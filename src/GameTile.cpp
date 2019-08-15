@@ -5,8 +5,8 @@ GetChunkPosFor(tile_map *TileMap, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTi
 	Result.TileChunkX = AbsTileX >> TileMap->ChunkShift;
 	Result.TileChunkY = AbsTileY >> TileMap->ChunkShift;
 	Result.TileChunkZ = AbsTileZ;
-	Result.RelTileX = AbsTileX & TileMap->ChunkMask;
-	Result.RelTileY = AbsTileY & TileMap->ChunkMask;
+	Result.RelTile.x = AbsTileX & TileMap->ChunkMask;
+	Result.RelTile.y = AbsTileY & TileMap->ChunkMask;
 
 	return Result;
 }
@@ -26,8 +26,8 @@ RecanonicalizePosition(tile_map *TileMap, tile_map_position Pos)
 {
 	tile_map_position Result = Pos;
 	
-	RecanonicalizeCoord(TileMap, &Result.AbsTileX, &Result.TileRelX);
-	RecanonicalizeCoord(TileMap, &Result.AbsTileY, &Result.TileRelY);
+	RecanonicalizeCoord(TileMap, &Result.AbsTileX, &Result.Offset.x);
+	RecanonicalizeCoord(TileMap, &Result.AbsTileY, &Result.Offset.y);
 	return Result;
 }
 
@@ -98,7 +98,7 @@ GetTileValue(tile_map *TileMap, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTile
 {
 	tile_chunk_position ChunkPos = GetChunkPosFor(TileMap, AbsTileX, AbsTileY, AbsTileZ);
 	tile_chunk *TileChunk = GetTileChunk(TileMap, ChunkPos.TileChunkX, ChunkPos.TileChunkY, ChunkPos.TileChunkZ);
-	bool32 Result = GetTileChunkTileValue(TileMap, TileChunk, ChunkPos.RelTileX, ChunkPos.RelTileY);
+	bool32 Result = GetTileChunkTileValue(TileMap, TileChunk, ChunkPos.RelTile.x, ChunkPos.RelTile.y);
 	return Result;
 }
 
@@ -116,7 +116,7 @@ SetTileValue(memory_arena &Arena, tile_map* TileMap, uint32 AbsTileX, uint32 Abs
 			TileChunk->Tiles[i] = 1;
 		}
 	}
-	SetTileValueUnchecked(TileMap, TileChunk, ChunkPos.RelTileX, ChunkPos.RelTileY, TileValue);
+	SetTileValueUnchecked(TileMap, TileChunk, ChunkPos.RelTile.x, ChunkPos.RelTile.y, TileValue);
 }
 
 internal bool32

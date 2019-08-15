@@ -15,4 +15,8 @@ FloorReal32ToInt32(real32 n)
 	return (int32)n;
 }
 
-
+inline real32 
+Square(real32 value){
+	real32 Result = value * value;
+	return Result;
+}

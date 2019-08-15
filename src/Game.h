@@ -80,6 +80,7 @@ struct game_controller_input{
 
 struct game_input {
 	game_controller_input controllers[5];
+	real32 dt;
 };
 
 inline game_controller_input *GetController(game_input* input, uint32 ControllerIndex){
@@ -95,6 +96,7 @@ struct debug_read_file_result
 	void *contents;
 };
 
+#include "Game_Math.h"
 #include "GameTile.h"
 #include "GameIntrinsics.h"
 
@@ -118,6 +120,9 @@ struct game_state {
 	world *World;
 	tile_map_position CameraP;
 	tile_map_position PlayerP;
+	vec2 PlayerAcc;
+	vec2 PlayerVel;
+
 	memory_arena MemoryArena;
 	bitmap_image BMPPixels;
 	//int32_t xoffset;
