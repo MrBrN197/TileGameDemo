@@ -597,7 +597,7 @@ static void Win32ProcessPendingMessages(game_controller_input *keyboardControlle
 					Win32ProcessKeyboardMessage(&keyboardController->moveRight, isDown);
 				}
 				if(VKCode == VK_SPACE){
-					Win32ProcessKeyboardMessage(&keyboardController->actionDown, isDown);
+					Win32ProcessKeyboardMessage(&keyboardController->start, isDown);
 				}
 				if(VKCode == 'L'){
 					if(isDown){
@@ -839,6 +839,8 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 				Win32ProcessXinputButton(gamepad->wButtons, XINPUT_GAMEPAD_DPAD_RIGHT, &oldState->moveRight, &newState->moveRight);
 				Win32ProcessXinputButton(gamepad->wButtons, XINPUT_GAMEPAD_LEFT_SHOULDER, &oldState->left_shoulder, &newState->left_shoulder);
 				Win32ProcessXinputButton(gamepad->wButtons, XINPUT_GAMEPAD_RIGHT_SHOULDER, &oldState->right_shoulder, &newState->right_shoulder);
+				Win32ProcessXinputButton(gamepad->wButtons, XINPUT_GAMEPAD_START, &oldState->start, &newState->start);
+				Win32ProcessXinputButton(gamepad->wButtons, XINPUT_GAMEPAD_BACK, &oldState->end, &newState->end);
 				float x = Win32ProcessXinputStickValue(gamepad->sThumbLX, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
 				float y = Win32ProcessXinputStickValue(gamepad->sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
 				newState->stickAverageX = x;

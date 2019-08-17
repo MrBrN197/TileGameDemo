@@ -116,12 +116,23 @@ struct bitmap_image{
 	uint32 Height;
 };
 
+struct entity{
+	bool Exists;
+	tile_map_position Position;
+	vec2 PlayerAcc;
+	vec2 PlayerVel;
+	real32 PlayerWidth;
+	real32 PlayerHeight;
+};
+
 struct game_state {
 	world *World;
 	tile_map_position CameraP;
-	tile_map_position PlayerP;
-	vec2 PlayerAcc;
-	vec2 PlayerVel;
+
+	uint32 EnitytCameraFollowsIndex;
+	entity Entities[256];
+	uint32 EntityIndexForController[ArrayCount(((game_input*)0)->controllers)];
+	uint32 EntityCount;
 
 	memory_arena MemoryArena;
 	bitmap_image BMPPixels;
