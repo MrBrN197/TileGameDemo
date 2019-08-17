@@ -382,27 +382,31 @@ FILETIME Win32GetLastWriteTime(const char *filename)
 	return fileData.ftLastWriteTime;
 }
 
-win32_game_code Win32LoadGameCode(const char* sourceDllName, const char* tempDllName)
+win32_game_code Win32LoadGameCode(const char* sourceDllName, const char* tempDllName, const char* lockPath)
 {
 	win32_game_code Result = {};
 
-	CopyFileA(sourceDllName, tempDllName, FALSE);
-	Result.lastWriteTime = Win32GetLastWriteTime(sourceDllName);
-	Result.GameCodeDLL = LoadLibraryA(tempDllName);
+	WIN32_FILE_ATTRIBUTE_DATA ignored;
+	if(!GetFileAttributesEx(lockPath, GetFileExInfoStandard, &ignored)){
+		OutputDebugString("Updating GameCode\n");
+		CopyFileA(sourceDllName, tempDllName, FALSE);
+		Result.lastWriteTime = Win32GetLastWriteTime(sourceDllName);
+		Result.GameCodeDLL = LoadLibraryA(tempDllName);
 
 
-	if (Result.GameCodeDLL)
-	{
-		Result.UpdateAndRender = (game_update_and_render *)GetProcAddress(Result.GameCodeDLL, "GameUpdateAndRender");
-		Result.GetSoundSamples = (game_get_sound_samples *)GetProcAddress(Result.GameCodeDLL, "GameGetSoundSamples");
+		if (Result.GameCodeDLL)
+		{
+			Result.UpdateAndRender = (game_update_and_render *)GetProcAddress(Result.GameCodeDLL, "GameUpdateAndRender");
+			Result.GetSoundSamples = (game_get_sound_samples *)GetProcAddress(Result.GameCodeDLL, "GameGetSoundSamples");
 
-		Result.isValid = (Result.UpdateAndRender && Result.GetSoundSamples);
+			Result.isValid = (Result.UpdateAndRender && Result.GetSoundSamples);
+		}
+
 	}
-
 	if (!Result.isValid)
 	{
-		Result.UpdateAndRender = NULL;
-		Result.GetSoundSamples = NULL;
+		Result.UpdateAndRender = nullptr;
+		Result.GetSoundSamples = nullptr;
 	}
 
 	return Result;
@@ -705,6 +709,8 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	Win32BuildEXEPathFileName(&win32State, "Game.dll", sourceDllFullPath);
 	char tempDllFullPath[MAX_PATH];
 	Win32BuildEXEPathFileName(&win32State, "Game_Temp.dll", tempDllFullPath);
+	char lockPath[MAX_PATH];
+	Win32BuildEXEPathFileName(&win32State, "lock.tmp", lockPath);
 
 	//Set Windows Sleep Granularity to 1ms
 	UINT desiredScheduler = 1;
@@ -797,16 +803,16 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	game_input *newInput = &input[1];
 	QueryPerformanceFrequency(&globalPerfCountFrequency);
 	LARGE_INTEGER lastCounter = Win32GetWallClock();
-	win32_game_code GameCode = Win32LoadGameCode(sourceDllFullPath, tempDllFullPath);
+	win32_game_code GameCode = {};
+	GameCode = Win32LoadGameCode(sourceDllFullPath, tempDllFullPath, lockPath);
 
 	while(Running)
 	{
 		FILETIME newDllWriteTime = Win32GetLastWriteTime(sourceDllFullPath);
 		if (CompareFileTime(&newDllWriteTime, &GameCode.lastWriteTime) != 0)
 		{
-			OutputDebugStringA(" >> Updating....\n");
 			Win32UnloadGameCode(&GameCode);
-			GameCode = Win32LoadGameCode(sourceDllFullPath, tempDllFullPath);
+			GameCode = Win32LoadGameCode(sourceDllFullPath, tempDllFullPath, lockPath);
 		}
 
 		game_controller_input *oldKeyboardController = &oldInput->controllers[0];

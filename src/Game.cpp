@@ -186,8 +186,8 @@ AddEntity(game_state *GameState){
 
 inline void
 MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
-	acceleration = acceleration * 30.f;
-	acceleration -= 5.f * Entity->PlayerVel;
+	acceleration = acceleration * 90.f;
+	acceleration -= 8.f * Entity->PlayerVel;
 	tile_map_position NewPlayerP = Entity->Position;
 	NewPlayerP.Offset += 0.5f * acceleration * Square(dt) + Entity->PlayerVel * dt;   // s = x + ut + 1/2at^2
 
