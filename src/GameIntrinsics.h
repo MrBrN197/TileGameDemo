@@ -1,18 +1,30 @@
 #pragma once
 
-inline uint32 truncateUint64(uint64_t n)
+inline uint32 truncateUint64(uint64_t value)
 {
-	ASSERT(n < 0xFFFFFFFF);
-	return (uint32)n;
+	ASSERT(value < 0xFFFFFFFF);
+	return (uint32)value;
+}
+
+#include <math.h>
+inline int32
+FloorReal32ToInt32(real32 value)
+{
+	return (int32)floorf(value);
+	// if(n < 0){
+		// n -= 1;
+	// }
+	// return (int32)n;
 }
 
 inline int32
-FloorReal32ToInt32(real32 n)
-{
-	if(n < 0){
-		n -= 1;
-	}
-	return (int32)n;
+Round(real32 value){
+	return roundf(value);
+}
+
+inline int32
+Ciel(real32 value){
+	return ceilf(value);
 }
 
 inline real32 

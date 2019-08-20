@@ -25,9 +25,9 @@ struct tile_map{
 	uint32 ChunkMask;
 	uint32 ChunkDim;
 
-	real32 TileSideInMeters;
+	real32 TileSideInMetres;
 	real32 TileSideInPixels;
-	real32 MetersToPixels;
+	real32 MetresToPixels;
 	
 	int32 TileChunkCountX;
 	int32 TileChunkCountY;

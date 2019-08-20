@@ -14,11 +14,12 @@ GetChunkPosFor(tile_map *TileMap, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTi
 inline void 
 RecanonicalizeCoord(tile_map *TileMap, int32 *Tile, real32 *TileRel)
 {
-	int32 Offset = FloorReal32ToInt32(*TileRel / TileMap->TileSideInMeters);
+	int32 Offset = Round(*TileRel / TileMap->TileSideInMetres);
 	*Tile += Offset;
-	*TileRel -= Offset * TileMap->TileSideInMeters;	
+	*TileRel -= Offset * TileMap->TileSideInMetres;	
 
-	ASSERT(*TileRel < TileMap->TileSideInMeters);
+	ASSERT(*TileRel <= TileMap->TileSideInMetres/2.0f);
+	ASSERT(*TileRel >= -TileMap->TileSideInMetres/2.0f);
 }
 
 inline tile_map_position
