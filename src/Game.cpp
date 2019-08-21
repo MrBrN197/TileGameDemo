@@ -161,7 +161,7 @@ InitializePlayer(game_state *GameState, entity *Entity){
 	Entity->Position.AbsTileY = 3;
 	Entity->Position.AbsTileZ = 0;
 	Entity->PlayerWidth = 0.75f * GameState->World->TileMap->TileSideInMetres;
-	Entity->PlayerHeight = (real32)GameState->World->TileMap->TileSideInMetres;
+	Entity->PlayerHeight = 0.5f * (real32)GameState->World->TileMap->TileSideInMetres;
 }
 
 inline entity*
@@ -192,7 +192,7 @@ TestWall(real32 WallX, real32 OriginX, real32 OriginY, real32 MinY, real32 MaxY,
 		real32 yPos = OriginY + tResult*PlayerDeltaY;
 		if((yPos < MaxY) && (yPos > MinY)){
 			if((tResult > 0.0f) && (tResult < *tMin)){
-				*tMin = Max(0.0f, tResult - 0.01f);
+				*tMin = Max(0.0f, tResult - 0.001f);
 			}
 		}
 			
@@ -253,15 +253,18 @@ MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
 
 	real32 TileSideInMetres = GameState->World->TileMap->TileSideInMetres;
 
-	int32 minx = FloorReal32ToInt32(Min(OldPlayerPos.AbsTileX, NewPlayerPos.AbsTileX) - Entity->PlayerWidth/TileSideInMetres); // /2.f
-	int32 miny = FloorReal32ToInt32(Min(OldPlayerPos.AbsTileY, NewPlayerPos.AbsTileY) - Entity->PlayerHeight/TileSideInMetres); // /2.f
-	uint32 MinTileX = Max(0.0f, minx);
-	uint32 MinTileY = Max(0.0f, miny);
+	uint32 MinTileX = Min(OldPlayerPos.AbsTileX, NewPlayerPos.AbsTileX);
+	uint32 MinTileY = Min(OldPlayerPos.AbsTileY, NewPlayerPos.AbsTileY);
+	uint32 MaxTileX = Max(OldPlayerPos.AbsTileX, NewPlayerPos.AbsTileX);
+	uint32 MaxTileY = Max(OldPlayerPos.AbsTileY, NewPlayerPos.AbsTileY);
 
-	real32 diffx = Abs(OldPlayerPos.AbsTileX - NewPlayerPos.AbsTileX) + Entity->PlayerWidth/TileSideInMetres;
-	real32 diffy = Abs(OldPlayerPos.AbsTileY - NewPlayerPos.AbsTileY) + Entity->PlayerHeight/TileSideInMetres;
-	uint32 TileDifferenceX = Ceil(Abs(OldPlayerPos.AbsTileX - NewPlayerPos.AbsTileX) + Entity->PlayerWidth/TileSideInMetres);
-	uint32 TileDifferenceY = Ceil(Abs(OldPlayerPos.AbsTileY - NewPlayerPos.AbsTileY) + Entity->PlayerHeight/TileSideInMetres);
+	uint32 EntityTileRelWidth = Ceil(0.5f*Entity->PlayerWidth/TileSideInMetres);
+	uint32 EntityTileRelHeight = Ceil(0.5f*Entity->PlayerHeight/TileSideInMetres);
+	
+	MinTileX = Max(0.0f, MinTileX - EntityTileRelWidth);
+	MinTileY = Max(0.0f, MinTileY - EntityTileRelHeight);
+	MaxTileX = Min(0xFFFFFFFF, MaxTileX + EntityTileRelWidth);
+	MaxTileY = Min(0xFFFFFFFF, MaxTileY + EntityTileRelHeight);
 
 	real32 tMin = 1.0f;
 
@@ -269,25 +272,21 @@ MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
 	OldPlayerAbsolutePos.x = OldPlayerPos.AbsTileX * TileSideInMetres + TileSideInMetres/2.f + OldPlayerPos.Offset.x;
 	OldPlayerAbsolutePos.y = OldPlayerPos.AbsTileY * TileSideInMetres + TileSideInMetres/2.f + OldPlayerPos.Offset.y;
 
-	for(uint32 Y = MinTileY; Y <= (MinTileY + TileDifferenceY); Y++){
-		for(uint32 X = MinTileX; X <= (MinTileX + TileDifferenceX); X++){
+	for(uint32 Y = MinTileY; Y <= MaxTileY; Y++){
+		for(uint32 X = MinTileX; X <= MaxTileX; X++){
 
 			// TODO: X and Y might go above the (2^32)-1
 
-			vec2 TilePosition = {X * TileSideInMetres + TileSideInMetres/2.f, Y * TileSideInMetres + TileSideInMetres/2.f};
+			vec2 MinCorner = {X * TileSideInMetres - Entity->PlayerWidth/2.f, Y * TileSideInMetres - Entity->PlayerHeight/2.f};
+			vec2 MaxCorner = {X * TileSideInMetres + TileSideInMetres + Entity->PlayerWidth/2.f, Y * TileSideInMetres + TileSideInMetres + Entity->PlayerHeight/2.f};
 
 			ASSERT(NewPlayerPos.AbsTileZ == OldPlayerPos.AbsTileZ);
 			uint32 TileValue = GetTileValue(GameState->World->TileMap, X, Y, OldPlayerPos.AbsTileZ);
 			if(TileValue == 2){
-				real32 MinX = TilePosition.x - TileSideInMetres/2.f;
-				real32 MaxX = TilePosition.x + TileSideInMetres/2.f;
-				real32 MinY = TilePosition.y - TileSideInMetres/2.f;
-				real32 MaxY = TilePosition.y + TileSideInMetres/2.f;
-
-				TestWall(MinX, OldPlayerAbsolutePos.x, OldPlayerAbsolutePos.y, MinY, MaxY, &tMin, PlayerDelta.x, PlayerDelta.y);
-				TestWall(MaxX, OldPlayerAbsolutePos.x, OldPlayerAbsolutePos.y, MinY, MaxY, &tMin, PlayerDelta.x, PlayerDelta.y);
-				TestWall(MinY, OldPlayerAbsolutePos.y, OldPlayerAbsolutePos.x, MinX, MaxX, &tMin, PlayerDelta.y, PlayerDelta.x);
-				TestWall(MaxY, OldPlayerAbsolutePos.y, OldPlayerAbsolutePos.x, MinX, MaxX, &tMin, PlayerDelta.y, PlayerDelta.x);
+				TestWall(MinCorner.x, OldPlayerAbsolutePos.x, OldPlayerAbsolutePos.y, MinCorner.y, MaxCorner.y, &tMin, PlayerDelta.x, PlayerDelta.y);
+				TestWall(MaxCorner.x, OldPlayerAbsolutePos.x, OldPlayerAbsolutePos.y, MinCorner.y, MaxCorner.y, &tMin, PlayerDelta.x, PlayerDelta.y);
+				TestWall(MinCorner.y, OldPlayerAbsolutePos.y, OldPlayerAbsolutePos.x, MinCorner.x, MaxCorner.x, &tMin, PlayerDelta.y, PlayerDelta.x);
+				TestWall(MaxCorner.y, OldPlayerAbsolutePos.y, OldPlayerAbsolutePos.x, MinCorner.x, MaxCorner.x, &tMin, PlayerDelta.y, PlayerDelta.x);
 			}
 		}
 	}
@@ -493,7 +492,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			PlayerCameraRelPosition = RecanonicalizePosition(GameState->World->TileMap, PlayerCameraRelPosition);
 
 			int32 minx = CenterX + (PlayerCameraRelPosition.AbsTileX * TileMap->TileSideInMetres + PlayerCameraRelPosition.Offset.x - Entity->PlayerWidth/2.f) * TileMap->MetresToPixels;
-			int32 maxy = CenterY - (PlayerCameraRelPosition.AbsTileY * TileMap->TileSideInMetres + PlayerCameraRelPosition.Offset.y) * TileMap->MetresToPixels;
+			int32 maxy = CenterY - (PlayerCameraRelPosition.AbsTileY * TileMap->TileSideInMetres + PlayerCameraRelPosition.Offset.y) * TileMap->MetresToPixels + Entity->PlayerHeight/2.f * TileMap->MetresToPixels;
 			int32 maxx = minx + Entity->PlayerWidth * TileMap->MetresToPixels;
 			int32 miny  = maxy - Entity->PlayerHeight * TileMap->MetresToPixels;
 			DrawRectangle(buffer, minx, miny, maxx, maxy, 0.85f, 0.25f, 0.3f);
