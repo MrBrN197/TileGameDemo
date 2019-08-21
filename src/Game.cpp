@@ -435,7 +435,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		}
 	}
 
-	// ENTITY MOVEMENT
+	// CAMERA MOVEMENT
 	const tile_map *TileMap = GameState->World->TileMap;
 	entity *CameraFollowingEntity = GetEntity(GameState, GameState->EnitytCameraFollowsIndex);
 	if(CameraFollowingEntity){
@@ -445,27 +445,27 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		vec2 Difference = {}; 
 		Difference.x = (CameraFollowingEntity->Position.AbsTileX - CameraP.AbsTileX) * TileMap->TileSideInMetres;
 		Difference.y = (CameraFollowingEntity->Position.AbsTileY - CameraP.AbsTileY) * TileMap->TileSideInMetres;
-		Difference.x += CameraFollowingEntity->Position.Offset.x - CameraP.Offset.x, CameraFollowingEntity->Position.Offset.y - CameraP.Offset.y;
-		Difference.y += CameraFollowingEntity->Position.Offset.x - CameraP.Offset.x, CameraFollowingEntity->Position.Offset.y - CameraP.Offset.y;
+		Difference.x += CameraFollowingEntity->Position.Offset.x - CameraP.Offset.x;
+		Difference.y += CameraFollowingEntity->Position.Offset.y - CameraP.Offset.y;
 
 		uint32 TilesPerWidth = 19;
 		uint32 TilesPerHeight = 7;
 
-		if(Difference.x > TileMap->TileSideInMetres * TilesPerWidth/2.f + TileMap->TileSideInMetres/2.f){
+		if(Difference.x > TileMap->TileSideInMetres * TilesPerWidth/2.f){
 			GameState->CameraP.AbsTileX += TilesPerWidth;
 		}
-		else if(Difference.x < -TileMap->TileSideInMetres * TilesPerWidth/2.f + TileMap->TileSideInMetres/2.f){
+		if(Difference.x < -TileMap->TileSideInMetres * TilesPerWidth/2.f){
 			GameState->CameraP.AbsTileX -= TilesPerWidth;
 		}
-		if(Difference.y > TileMap->TileSideInMetres * TilesPerHeight/2.f + TileMap->TileSideInMetres/2.f){
+		if(Difference.y > TileMap->TileSideInMetres * TilesPerHeight/2.f){
 			GameState->CameraP.AbsTileY += TilesPerHeight;
 		}
-		if(Difference.y < -TileMap->TileSideInMetres * TilesPerHeight/2.f + TileMap->TileSideInMetres/2.f){
+		if(Difference.y < -TileMap->TileSideInMetres * TilesPerHeight/2.f){
 			GameState->CameraP.AbsTileY -= TilesPerHeight;
 		}
 	}
 
-	// DRAWING PLAYERS
+	// DRAWING TILES
 	real32 CenterX = buffer->width/2.f;
 	real32 CenterY = buffer->height/2.f;
 	DrawRectangle(buffer, 0, 0, buffer->width, buffer->height, 0.2f, 0.3f, 0.8f);
@@ -483,8 +483,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				if (TileValue == 2)
 					Gray = 1.0f;
 
-				//if((AbsColumn == GameState->CameraP.AbsTileX) && (AbsRow == GameState->CameraP.AbsTileY))
-				//	Gray = 0.f;
+				if((AbsColumn == GameState->CameraP.AbsTileX) && (AbsRow == GameState->CameraP.AbsTileY))
+					Gray -= 0.1f;
 
 				int32 MinX = CenterX - TileMap->TileSideInPixels/2.f + (RelColumn * TileMap->TileSideInPixels) - (GameState->CameraP.Offset.x * TileMap->MetresToPixels);
 				int32 MinY = CenterY - TileMap->TileSideInPixels/2.f - (RelRow * TileMap->TileSideInPixels) + (GameState->CameraP.Offset.y * TileMap->MetresToPixels);
@@ -502,16 +502,16 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	entity *Entity = &GameState->Entities[1];
 	for (uint32 EntityIndex = 0; EntityIndex < GameState->EntityCount; EntityIndex++, Entity++){
 		if(Entity->Exists){
-			tile_map_position PlayerCameraRelPosition = {};
-			PlayerCameraRelPosition.AbsTileX = Entity->Position.AbsTileX - GameState->CameraP.AbsTileX;
-			PlayerCameraRelPosition.AbsTileY = Entity->Position.AbsTileY - GameState->CameraP.AbsTileY;
-			PlayerCameraRelPosition.Offset = Entity->Position.Offset - GameState->CameraP.Offset;
-			PlayerCameraRelPosition = RecanonicalizePosition(GameState->World->TileMap, PlayerCameraRelPosition);
+			vec2 PlayerCameraRelPosition = {};
+			PlayerCameraRelPosition.x = (Entity->Position.AbsTileX - GameState->CameraP.AbsTileX) * TileMap->TileSideInMetres;
+			PlayerCameraRelPosition.y = (Entity->Position.AbsTileY - GameState->CameraP.AbsTileY) * TileMap->TileSideInMetres;
+			PlayerCameraRelPosition.x += (Entity->Position.Offset.x - GameState->CameraP.Offset.x);
+			PlayerCameraRelPosition.y += (Entity->Position.Offset.y - GameState->CameraP.Offset.y);
 
-			int32 minx = CenterX + (PlayerCameraRelPosition.AbsTileX * TileMap->TileSideInMetres + PlayerCameraRelPosition.Offset.x - Entity->PlayerWidth/2.f) * TileMap->MetresToPixels;
-			int32 maxy = CenterY - (PlayerCameraRelPosition.AbsTileY * TileMap->TileSideInMetres + PlayerCameraRelPosition.Offset.y) * TileMap->MetresToPixels + Entity->PlayerHeight/2.f * TileMap->MetresToPixels;
+			int32 minx = CenterX + (PlayerCameraRelPosition.x - Entity->PlayerWidth/2.f) * TileMap->MetresToPixels;
+			int32 miny = CenterY - (PlayerCameraRelPosition.y + Entity->PlayerHeight/2.f) * TileMap->MetresToPixels;
 			int32 maxx = minx + Entity->PlayerWidth * TileMap->MetresToPixels;
-			int32 miny  = maxy - Entity->PlayerHeight * TileMap->MetresToPixels;
+			int32 maxy = miny + Entity->PlayerHeight * TileMap->MetresToPixels;
 			DrawRectangle(buffer, minx, miny, maxx, maxy, 0.85f, 0.25f, 0.3f);
 			DrawRectangle(buffer, 0, buffer->height/2, buffer->width, buffer->height/2+1, 0.8f, 0.2, 0.3f);
 			DrawRectangle(buffer, buffer->width/2, 0, buffer->width/2+1, buffer->height, 0.8f, 0.2, 0.3f);
