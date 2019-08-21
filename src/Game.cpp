@@ -184,6 +184,21 @@ AddEntity(game_state *GameState){
 	return Result;
 }
 
+inline void 
+TestWall(real32 WallX, real32 OriginX, real32 OriginY, real32 MinY, real32 MaxY, real32* tMin, real32 PlayerDeltaX, real32 PlayerDeltaY){
+
+	if(Abs(PlayerDeltaX) > 0.0f){
+		real32 tResult = (WallX - OriginX)/ PlayerDeltaX;
+		real32 yPos = OriginY + tResult*PlayerDeltaY;
+		if((yPos < MaxY) && (yPos > MinY)){
+			if((tResult > 0.0f) && (tResult < *tMin)){
+				*tMin = Max(0.0f, tResult - 0.01f);
+			}
+		}
+			
+	}
+}
+
 inline void
 MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
 	acceleration = acceleration * 90.f;
@@ -194,6 +209,7 @@ MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
 	NewPlayerPos.Offset += PlayerDelta;
 	NewPlayerPos = RecanonicalizePosition(GameState->World->TileMap, NewPlayerPos);
 
+#if 0
 	// COLLISION
 	tile_map_position CollisionDirection = {};
 	tile_map_position LeftEdge = NewPlayerPos;
@@ -233,6 +249,52 @@ MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
 		ASSERT(!((Normal.x == 0) && (Normal.y == 0)));
 		Entity->PlayerVel = Entity->PlayerVel - (2 * dot(Entity->PlayerVel, Normal)) * Normal;  // V + (2*(N*V))*N
 	}
+#else
+
+	real32 TileSideInMetres = GameState->World->TileMap->TileSideInMetres;
+
+	int32 minx = FloorReal32ToInt32(Min(OldPlayerPos.AbsTileX, NewPlayerPos.AbsTileX) - Entity->PlayerWidth/TileSideInMetres); // /2.f
+	int32 miny = FloorReal32ToInt32(Min(OldPlayerPos.AbsTileY, NewPlayerPos.AbsTileY) - Entity->PlayerHeight/TileSideInMetres); // /2.f
+	uint32 MinTileX = Max(0.0f, minx);
+	uint32 MinTileY = Max(0.0f, miny);
+
+	real32 diffx = Abs(OldPlayerPos.AbsTileX - NewPlayerPos.AbsTileX) + Entity->PlayerWidth/TileSideInMetres;
+	real32 diffy = Abs(OldPlayerPos.AbsTileY - NewPlayerPos.AbsTileY) + Entity->PlayerHeight/TileSideInMetres;
+	uint32 TileDifferenceX = Ceil(Abs(OldPlayerPos.AbsTileX - NewPlayerPos.AbsTileX) + Entity->PlayerWidth/TileSideInMetres);
+	uint32 TileDifferenceY = Ceil(Abs(OldPlayerPos.AbsTileY - NewPlayerPos.AbsTileY) + Entity->PlayerHeight/TileSideInMetres);
+
+	real32 tMin = 1.0f;
+
+	vec2 OldPlayerAbsolutePos = {};
+	OldPlayerAbsolutePos.x = OldPlayerPos.AbsTileX * TileSideInMetres + TileSideInMetres/2.f + OldPlayerPos.Offset.x;
+	OldPlayerAbsolutePos.y = OldPlayerPos.AbsTileY * TileSideInMetres + TileSideInMetres/2.f + OldPlayerPos.Offset.y;
+
+	for(uint32 Y = MinTileY; Y <= (MinTileY + TileDifferenceY); Y++){
+		for(uint32 X = MinTileX; X <= (MinTileX + TileDifferenceX); X++){
+
+			// TODO: X and Y might go above the (2^32)-1
+
+			vec2 TilePosition = {X * TileSideInMetres + TileSideInMetres/2.f, Y * TileSideInMetres + TileSideInMetres/2.f};
+
+			ASSERT(NewPlayerPos.AbsTileZ == OldPlayerPos.AbsTileZ);
+			uint32 TileValue = GetTileValue(GameState->World->TileMap, X, Y, OldPlayerPos.AbsTileZ);
+			if(TileValue == 2){
+				real32 MinX = TilePosition.x - TileSideInMetres/2.f;
+				real32 MaxX = TilePosition.x + TileSideInMetres/2.f;
+				real32 MinY = TilePosition.y - TileSideInMetres/2.f;
+				real32 MaxY = TilePosition.y + TileSideInMetres/2.f;
+
+				TestWall(MinX, OldPlayerAbsolutePos.x, OldPlayerAbsolutePos.y, MinY, MaxY, &tMin, PlayerDelta.x, PlayerDelta.y);
+				TestWall(MaxX, OldPlayerAbsolutePos.x, OldPlayerAbsolutePos.y, MinY, MaxY, &tMin, PlayerDelta.x, PlayerDelta.y);
+				TestWall(MinY, OldPlayerAbsolutePos.y, OldPlayerAbsolutePos.x, MinX, MaxX, &tMin, PlayerDelta.y, PlayerDelta.x);
+				TestWall(MaxY, OldPlayerAbsolutePos.y, OldPlayerAbsolutePos.x, MinX, MaxX, &tMin, PlayerDelta.y, PlayerDelta.x);
+			}
+		}
+	}
+	OldPlayerPos.Offset += PlayerDelta * tMin;
+	OldPlayerPos = RecanonicalizePosition(GameState->World->TileMap, OldPlayerPos);
+	Entity->Position = OldPlayerPos;
+#endif
 	Entity->PlayerVel += acceleration * dt;
 }
 
@@ -391,9 +453,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	real32 CenterX = buffer->width/2.f;
 	real32 CenterY = buffer->height/2.f;
 	DrawRectangle(buffer, 0, 0, buffer->width, buffer->height, 0.2f, 0.3f, 0.8f);
-	for (int32 RelRow = -20; RelRow <= 20; RelRow++)
+	for (int32 RelRow = -3; RelRow <= 3; RelRow++)
 	{
-		for (int32 RelColumn = -20; RelColumn <= 20; RelColumn++)
+		for (int32 RelColumn = -9; RelColumn <= 9; RelColumn++)
 		{
 			real32 Gray = 0.25f;
 

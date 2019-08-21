@@ -27,6 +27,20 @@ Ceil(real32 value){
 	return ceilf(value);
 }
 
+inline real32
+Min(real32 a, real32 b){
+	return (a < b) ? a : b; 
+}
+inline real32
+Max(real32 a, real32 b){
+	return (a > b) ? a : b;
+}
+
+inline real32
+Abs(real32 value){
+	return fabsf(value);
+}
+
 inline real32 
 Square(real32 value){
 	real32 Result = value * value;
