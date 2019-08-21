@@ -343,17 +343,14 @@ static void Win32RecordInput(win32_state *win32State, game_input *newInput){
 
 static void Win32PlaybackInput(win32_state *win32State, game_input *newInput){
 	DWORD bytesRead;
-	if(ReadFile(win32State->PlaybackHandle, newInput, sizeof(*newInput), &bytesRead, NULL)){
-		if (bytesRead == 0)
-		{
-			Win32EndInputPlayback(win32State);
-			Win32BeginInputPlayback(win32State, win32State->InputPlaybackIndex);
-			ReadFile(win32State->PlaybackHandle, newInput, sizeof(*newInput), &bytesRead, NULL);
-		}
-		ASSERT(bytesRead == sizeof(*newInput));
-	}else{
-		ASSERT(false);
+	ASSERT(ReadFile(win32State->PlaybackHandle, newInput, sizeof(*newInput), &bytesRead, NULL));
+	if (bytesRead == 0)
+	{
+		Win32EndInputPlayback(win32State);
+		Win32BeginInputPlayback(win32State, win32State->InputPlaybackIndex);
+		ASSERT(ReadFile(win32State->PlaybackHandle, newInput, sizeof(*newInput), &bytesRead, NULL));
 	}
+	ASSERT(bytesRead == sizeof(*newInput));
 }
 
 #define XINPUT_GET_STATE(name) DWORD name( DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -975,6 +972,16 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 		ReleaseDC(windowHandle, context);
 		*oldInput = *newInput;
 	}
+	char fullPath[WIN32_MAX_PATH];
+	Win32BuildEXEPathFileName(&win32State, win32State.filename, fullPath);
+	if(win32State.InputPlaybackIndex){
+		Win32EndInputPlayback(&win32State);
+	}
+	if(win32State.InputRecordingIndex){
+		Win32EndRecordingInput(&win32State);
+	}
+	DeleteFile(fullPath);
+	DeleteFile("game_state");
 	delete[] samples;
 	return 0;
 }
