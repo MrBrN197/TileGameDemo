@@ -17,7 +17,7 @@ struct tile_map_position{
 };
 
 struct tile_chunk{
-	int32* Tiles;
+	uint32* Tiles;
 };
 
 struct tile_map{

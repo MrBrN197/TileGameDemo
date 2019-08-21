@@ -41,9 +41,9 @@ GetTileChunk(tile_map *TileMap, uint32 TileChunkX, uint32 TileChunkY, uint32 Til
 	 && (TileChunkY < TileMap->TileChunkCountY)
 	 && (TileChunkZ < TileMap->TileChunkCountZ)){
 
-		// 3D indexing ->    [z * (y * width * height)] + [(y * width)] + [x]
+		// 3D indexing ->    [(z * width * height)] + [(y * width)] + [x]
 		TileChunk = &TileMap->TileChunks[
-			TileChunkZ * (TileChunkY * TileMap->TileChunkCountX * TileMap->TileChunkCountX)
+			(TileChunkZ * TileMap->TileChunkCountX * TileMap->TileChunkCountY)
 			+ (TileChunkY * TileMap->TileChunkCountX)
 			+ TileChunkX];
 	 }
@@ -59,7 +59,7 @@ GetTileValueUnchecked(tile_map *TileMap, tile_chunk *TileChunk, int32 TileX, int
 	ASSERT(TileX < TileMap->ChunkDim);
 	ASSERT(TileY < TileMap->ChunkDim);
 
-	int32 Result = TileChunk->Tiles[TileY * TileMap->ChunkDim + TileX];
+	uint32 Result = TileChunk->Tiles[TileY * TileMap->ChunkDim + TileX];
 	return Result;
 }
 
@@ -94,12 +94,12 @@ GetTileChunkTileValue(tile_map *TileMap, tile_chunk *TileChunk, int32 TileX, int
 // 	return Result;
 // }
 
-internal bool32
+internal uint32
 GetTileValue(tile_map *TileMap, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ)
 {
 	tile_chunk_position ChunkPos = GetChunkPosFor(TileMap, AbsTileX, AbsTileY, AbsTileZ);
 	tile_chunk *TileChunk = GetTileChunk(TileMap, ChunkPos.TileChunkX, ChunkPos.TileChunkY, ChunkPos.TileChunkZ);
-	bool32 Result = GetTileChunkTileValue(TileMap, TileChunk, ChunkPos.RelTile.x, ChunkPos.RelTile.y);
+	uint32 Result = GetTileChunkTileValue(TileMap, TileChunk, ChunkPos.RelTile.x, ChunkPos.RelTile.y);
 	return Result;
 }
 
@@ -112,8 +112,8 @@ SetTileValue(memory_arena &Arena, tile_map* TileMap, uint32 AbsTileX, uint32 Abs
 	// TODO: Create TileChunks Dynamically
 	ASSERT(TileChunk);
 	if(!TileChunk->Tiles){
-		TileChunk->Tiles = PushArray(Arena, TileMap->ChunkDim * TileMap->ChunkDim, int32);
-		for(int i =0; i < TileMap->ChunkDim * TileMap->ChunkDim; i++){
+		TileChunk->Tiles = PushArray(Arena, TileMap->ChunkDim * TileMap->ChunkDim, uint32);
+		for(int i = 0; i < TileMap->ChunkDim * TileMap->ChunkDim; i++){
 			TileChunk->Tiles[i] = 1;
 		}
 	}

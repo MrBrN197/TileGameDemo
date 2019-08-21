@@ -173,8 +173,8 @@ struct game_memory
 inline void*
 PushStruct_(memory_arena &Arena, size_t Size){
 	ASSERT(Arena.Used + Size <= Arena.Size);
+	void* Result = (Arena.Base + Arena.Used);
 	Arena.Used += Size;
-	void* Result = (Arena.Base + Size);
 	return Result;
 }
 

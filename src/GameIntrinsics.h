@@ -23,7 +23,7 @@ Round(real32 value){
 }
 
 inline int32
-Ciel(real32 value){
+Ceil(real32 value){
 	return ceilf(value);
 }
 
