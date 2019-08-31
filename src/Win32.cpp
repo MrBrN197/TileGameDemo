@@ -726,15 +726,19 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	ATOM status  = RegisterClassA(&windowClass);
 	ASSERT(status);
 
+	RECT rect;
+	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
+	int width = WIDTH + rect.right - rect.left;
+	int height = HEIGHT + rect.bottom - rect.top;
 	HWND windowHandle = CreateWindowExA(
 		NULL /* WS_EX_LAYERED */,
 		windowClass.lpszClassName,
 		"TileGame Demo",
 		WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		WIDTH,
-		HEIGHT,
+		0,
+		0,
+		width,
+		height,
 		0,
 		0,
 		hInstance,
