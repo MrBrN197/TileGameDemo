@@ -28,16 +28,16 @@ using uint8 = uint8_t;
 
 struct game_sound_buffer{
 	int16_t *samples;
-	int sampleCount;
+	uint32 sampleCount;
 };
 
 struct game_back_buffer {
 	//BITMAPINFO bitmapInfo;
 	void* memory;
-	int width;
-	int height;
-	int pitch;
-	int bytesPerPixel;
+	uint32 width;
+	uint32 height;
+	uint32 pitch;
+	uint32 bytesPerPixel;
 };
 
 struct game_button_state {

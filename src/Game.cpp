@@ -2,21 +2,21 @@
 #include "Game.h"
 #include "GameTile.cpp"
 
-void FillSoundBuffer(int16_t *samples, int32_t sampleCount)
+void FillSoundBuffer(int16 *samples, int32 sampleCount)
 {
-	int32_t toneHz = 440;
-	int32_t period = 48000 / 440;
-	int32_t volume = 50;
+	int32 toneHz = 440;
+	int32 period = 48000 / 440;
+	int32 volume = 50;
 
 	const float delta = (2 * PI) / (float)period;
 
-	int32_t blocks = sampleCount / 2;
-	int16_t *iter = samples;
+	int32 blocks = sampleCount / 2;
+	int16 *iter = samples;
 	for (int i = 0; i < blocks; i++)
 	{
 		//t += delta;
 		float sinT = 1; //sinf(t);
-		int16_t sampleValue = (int16_t)(sinT * volume);
+		int16 sampleValue = (int16)(sinT * volume);
 		*iter++ = sampleValue;
 		*iter++ = sampleValue;
 	}
@@ -37,7 +37,7 @@ internal void BoundValue(int32 &Value, int32 LowerBound, int32 UpperBound){
 
 internal void DrawRectangle(game_back_buffer *buffer, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY, float R, float G, float B)
 {	
-	uint8_t *row = (uint8_t *)buffer->memory;
+	uint8 *row = (uint8 *)buffer->memory;
 
 	ASSERT(MinX < MaxX);
 	ASSERT(MinY < MaxY);
@@ -50,10 +50,10 @@ internal void DrawRectangle(game_back_buffer *buffer, int32 MinX, int32 MinY, in
 	row += (buffer->pitch) * MinY;
 	row += MinX * (buffer->bytesPerPixel);
 
-	for (uint32_t y = 0; y < (MaxY - MinY); y++)
+	for (uint32 y = 0; y < (MaxY - MinY); y++)
 	{
-		uint32_t *pixel = (uint32_t *)row;
-		for (uint32_t x = 0; x < (MaxX - MinX); x++)
+		uint32 *pixel = (uint32 *)row;
+		for (uint32 x = 0; x < (MaxX - MinX); x++)
 		{
 			int32 r = R * 255;
 			int32 g = G * 255;
@@ -314,6 +314,53 @@ MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
 #endif
 }
 
+void DrawPoint(game_back_buffer* buffer, vec2& pos, int size){
+	pos.y = buffer->height - pos.y;
+	DrawRectangle(buffer, pos.x - size, pos.y - size, pos.x + size, pos.y + size, 1.f, 1.f, 1.f);
+}
+
+void DrawLine(game_back_buffer* buffer, vec2& pos1, vec2 pos2, float R, float G, float B){
+
+	ASSERT(pos1.x >= 0);
+	ASSERT(pos1.y >= 0);
+	ASSERT(pos2.x >= 0);
+	ASSERT(pos2.y >= 0);
+
+	vec2 difference = pos2 - pos1;
+	int32 dx = FloorReal32ToInt32(difference.x);
+	int32 dy = FloorReal32ToInt32(difference.y);
+
+	float gradient = dx/(float)dy;
+
+ 	uint32* row = ((uint32*)buffer->memory + buffer->width * FloorReal32ToInt32(pos1.y) + FloorReal32ToInt32(pos1.x));
+	for(uint32 y = 0; y < Abs(dy); y++){
+		uint32 lineWidth = 1;
+		for(uint32 x = 0; x < lineWidth; x++){
+			int32 r = R * 255;
+			int32 g = G * 255;
+			int32 b = B * 255;
+			*row = ((255 << 24) | (r << 16) | (g << 8) | b);
+		}
+		if(dy >= 0){
+			row += buffer->width;
+		}else{
+			row -= buffer->width;
+		}
+		if(dx >= 0){
+			row += (Ceil(Abs(gradient)));
+		}else{
+			row -= (Ceil(Abs(gradient)));
+		}
+	}
+}
+
+void ClearBuffer(game_back_buffer* buffer){
+	uint8 *memory = (uint8*)buffer->memory;
+	for(int i = 0; i < buffer->width * buffer->height * buffer->bytesPerPixel; i++){
+		*(memory++) = 0;
+	}
+}
+
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
 
@@ -521,4 +568,14 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		}
 	}
 
+	vec2 a = {0.5f, 0.8f};
+	vec2 b = {0.2f, 0.2f};
+
+	a.x *= buffer->width;
+	a.y *= buffer->height;
+	b.x *= buffer->width;
+	b.y *= buffer->height;
+	b.y = buffer->height - b.y;
+	a.y = buffer->height - a.y;
+	DrawLine(buffer, a, b, 0.82f, 0.2f, 0.35f);
 }

@@ -17,6 +17,16 @@ FloorReal32ToInt32(real32 value)
 	// return (int32)n;
 }
 
+inline uint32
+FloorReal32ToUInt32(real32 value)
+{
+	return (uint32)floorf(value);
+	// if(n < 0){
+		// n -= 1;
+	// }
+	// return (int32)n;
+}
+
 inline int32
 Round(real32 value){
 	return roundf(value);
