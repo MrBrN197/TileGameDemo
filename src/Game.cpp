@@ -354,16 +354,108 @@ void DrawLine(game_back_buffer* buffer, vec2& pos1, vec2 pos2, float R, float G,
 	}
 }
 
-void ClearBuffer(game_back_buffer* buffer){
-	uint8 *memory = (uint8*)buffer->memory;
-	for(int i = 0; i < buffer->width * buffer->height * buffer->bytesPerPixel; i++){
-		*(memory++) = 0;
+void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, float G, float B){
+
+	ASSERT((p1.x != p2.x) && (p1.x != p3.x) && (p2.x != p3.x));
+	ASSERT((p1.y != p2.y) && (p1.y != p3.y) && (p2.y != p3.y));
+	ASSERT(!((p1.x == p1.y) && p1.y == p3.y));
+	ASSERT(!((p1.x == p1.x) && p1.x == p3.x));
+
+	vec2* v1 = &p1;
+	vec2* v2 = &p2;
+	vec2* v3 = &p3;
+
+	if(v2->y < v1->y){
+		vec2* temp = v2;
+		v2 = v1;
+		v1 = temp;
 	}
+	if(v3->y < v2->y){
+		vec2* temp = v3;
+		v3 = v2; 
+		v2 = temp;
+	}
+	if(v2->y < v1->y){
+		vec2* temp = v2;
+		v2 = v1; 
+		v1 = temp;
+	}
+	ASSERT((v1->y < v2->y) && (v2->y < v3->y));
+
+	float m13 = (v3->y - v1->y) / (v3->x - v1->x);
+	float m12 = (v2->y - v1->y) / (v2->x - v1->x);
+
+	int32 yStart = Ceil(v1->y - 0.5f);
+	int32 yEnd = Ceil(v2->y - 0.5f);
+	
+	uint32* row = (uint32*)buffer->memory + buffer->width * yStart;
+
+	for(int y = yStart; y< yEnd; y++){
+
+		float deltaY = (y + 0.5f - v1->y);
+		float x2EndPoint = v1->x + deltaY * 1.f/m12;
+		float x3EndPoint = v1->x + deltaY * 1.f/m13;
+		int xEnd = Ceil(x2EndPoint - 0.5f);
+		int xStart = Ceil(x3EndPoint - 0.5f);
+
+		uint32* pixels = row + xStart;
+		for (int x = xStart; x < xEnd; x++){
+			int32 r = R * 255;
+			int32 g = G * 255;
+			int32 b = B * 255;
+			*pixels++ = ((255 << 24) | (r << 16) | (g << 8) | b);
+		}
+		row += buffer->width;
+	}
+	// Second Half of Triangle
+
+	float Y = v2->y - v1->y;  // Optimize Get NewHalfPoint
+	float X = v1->x + Y * 1.f/m13;
+	vec2 seconHalfPoint = vec2{X, Y};
+
+	yStart = Ceil(seconHalfPoint.y - 0.5f);
+	yEnd = Ceil(v3->y -0.5f);
+	float m23 = (v3->y - v2->y)/(v3->x - v2->x);
+
+	for (int y = yStart; y < yEnd; y++)
+	{
+		float deltaY = (y + 0.5f - seconHalfPoint.y);
+		int xStart = seconHalfPoint.x  + deltaY * 1.f/m13; 
+		int xEnd = v2->x + deltaY * 1.f/m23;
+		
+		uint32* pixels = row + xStart;
+		for (int x = xStart; x < xEnd; x++)
+		{
+			int32 r = R * 255;
+			int32 g = G * 255;
+			int32 b = B * 255;
+			*pixels++ = ((255 << 24) | (r << 16) | (g << 8) | b);
+		}
+		row += buffer->width;
+	}
+}
+
+void ClearBuffer(game_back_buffer* buffer){
+	uint32 *memory = (uint32*)buffer->memory;
+	for(int i = 0; i < buffer->width * buffer->height; i++){
+		uint8 r = 54;
+		uint8 g = 144;
+		uint8 b = 66;
+		*memory++ = (255 << 25) | (r << 16) | (g << 8) | b;
+	}
+}
+
+void MapPointToScreen(game_back_buffer* buffer, vec2& point){
+	ASSERT(point.x >= 0.f &&  point.x <= 1.0f);
+	ASSERT(point.y >= 0.f &&  point.y <= 1.0f);
+
+	point.x *= buffer->width;
+	point.y = (1 - point.y) * buffer->height;
 }
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
-
+	ClearBuffer(buffer);
 #define CHUNK_DIM 256
 
 	ASSERT(sizeof(game_state) <= memory->permanentStorageSize);
@@ -568,14 +660,19 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		}
 	}
 
-	vec2 a = {0.5f, 0.8f};
-	vec2 b = {0.2f, 0.2f};
+	vec2 p1 = {0.3f, 0.2f};
+	vec2 p2 = {0.7f, 0.5f};
+	vec2 p3 = {0.1f, 0.9f};
+	vec2 p4 = {0.5f, 0.1f};
+	vec2 p5 = {0.9f, 0.3f};
+	vec2 p6 = {0.6f, 0.9f};
 
-	a.x *= buffer->width;
-	a.y *= buffer->height;
-	b.x *= buffer->width;
-	b.y *= buffer->height;
-	b.y = buffer->height - b.y;
-	a.y = buffer->height - a.y;
-	DrawLine(buffer, a, b, 0.82f, 0.2f, 0.35f);
+	MapPointToScreen(buffer, p1);
+	MapPointToScreen(buffer, p2);
+	MapPointToScreen(buffer, p3);
+	MapPointToScreen(buffer, p4);
+	MapPointToScreen(buffer, p5);
+	MapPointToScreen(buffer, p6);
+	DrawTriangle(buffer, p1, p2, p3, 0.84f, 0.2f, 0.3f);
+	DrawTriangle(buffer, p4, p5, p6, 0.84f, 0.66f, 0.2f);
 }
