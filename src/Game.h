@@ -125,6 +125,15 @@ struct entity{
 	real32 PlayerHeight;
 };
 
+#define MAX_INDEX_COUNT 256
+#define MAX_VERTEX_COUNT 64
+struct index_buffer{
+	uint32 indices[MAX_INDEX_COUNT];
+};
+struct vertex_buffer{
+	vec2 vertices[MAX_VERTEX_COUNT];
+};
+
 struct game_state {
 	world *World;
 	tile_map_position CameraP;

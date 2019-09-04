@@ -356,10 +356,17 @@ void DrawLine(game_back_buffer* buffer, vec2& pos1, vec2 pos2, float R, float G,
 
 void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, float G, float B){
 
-	ASSERT((p1.x != p2.x) && (p1.x != p3.x) && (p2.x != p3.x));
-	ASSERT((p1.y != p2.y) && (p1.y != p3.y) && (p2.y != p3.y));
-	ASSERT(!((p1.x == p1.y) && p1.y == p3.y));
-	ASSERT(!((p1.x == p1.x) && p1.x == p3.x));
+	// ASSERT((p1.x != p2.x) && (p1.x != p3.x) && (p2.x != p3.x));
+	// ASSERT((p1.y != p2.y) && (p1.y != p3.y) && (p2.y != p3.y));
+
+	// triangle where all points lie on the same line (finds only vertical and horizantal lines)
+	ASSERT(!((p1.y == p2.y) && (p1.y == p3.y)));
+	ASSERT(!((p1.x == p2.x) && (p1.x == p3.x)));
+
+	// triangle where two points are the same
+	ASSERT(!((p1.x == p2.x) && (p1.y == p2.y)));
+	ASSERT(!((p1.x == p3.x) && (p1.y == p3.y)));
+	ASSERT(!((p2.x == p3.x) && (p2.y == p3.y)));
 
 	vec2* v1 = &p1;
 	vec2* v2 = &p2;
@@ -380,12 +387,23 @@ void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, 
 		v2 = v1; 
 		v1 = temp;
 	}
-	ASSERT((v1->y < v2->y) && (v2->y < v3->y));
+	ASSERT((v1->y <= v2->y) && (v2->y <= v3->y));
 
-	float m13 = (v3->y - v1->y) / (v3->x - v1->x);
-	float m12 = (v2->y - v1->y) / (v2->x - v1->x);
+	float m13;
+	float m12;
+	float dy13 = (v3->y - v1->y);
+	if(dy13 == 0.f)
+		ASSERT(false);
+	m13 = (v3->x - v1->x) / (v3->y - v1->y);
 
-	float xIntersection = v1->x + (v2->y - v1->y) * 1.f/m13;
+	float dy12 = (v2->y - v1->y);
+	if(dy12 == 0.f){
+		m12 = 0.f;
+	}else{
+		m12 = (v2->x - v1->x) / (v2->y - v1->y) ;
+	}
+
+	float xIntersection = v1->x + (v2->y - v1->y) * m13;
 	ASSERT(xIntersection != v2->x);
 
 	int32 yStart = Ceil(v1->y - 0.5f);
@@ -396,8 +414,8 @@ void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, 
 	for(int y = yStart; y< yEnd; y++){
 
 		float deltaY = (y + 0.5f - v1->y);
-		float point1 = v1->x + deltaY * 1.f/m13;
-		float point2 = v1->x + deltaY * 1.f/m12;
+		float point1 = v1->x + deltaY * m13;
+		float point2 = v1->x + deltaY * m12;
 
 		int start = Ceil(point1 - 0.5f);
 		int end = Ceil(point2 - 0.5f);
@@ -422,18 +440,24 @@ void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, 
 
 	float Y = v2->y;  // Optimize Get NewHalfPoint
 	float d12 = (v2->y - v1->y);
-	float X = v1->x +  d12 * 1.f/m13;
+	float X = v1->x + d12 * m13;
 	vec2 secondHalfPoint = vec2{X, Y};
 
 	yStart = Ceil(secondHalfPoint.y - 0.5f);
 	yEnd = Ceil(v3->y -0.5f);
-	float m23 = (v3->y - v2->y)/(v3->x - v2->x);
+	float m23;
+	if(m23  == 0.f){
+		// m23 = 0.f;
+		ASSERT(false);
+	}else{
+		m23 = (v3->x - v2->x)/(v3->y - v2->y);
+	}
 
 	for (int y = yStart; y < yEnd; y++)
 	{
 		float deltaY = (y + 0.5f - secondHalfPoint.y);
-		float point1 = secondHalfPoint.x  + deltaY * 1.f/m13;
-		float point2 = v2->x + deltaY * 1.f/m23;
+		float point1 = secondHalfPoint.x  + deltaY * m13;
+		float point2 = v2->x + deltaY * m23;
 		
 		int start = Ceil(point1 - 0.5f);
 		int end = Ceil(point2 - 0.5f);
@@ -453,6 +477,16 @@ void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, 
 			*pixels++ = ((255 << 24) | (r << 16) | (g << 8) | b);
 		}
 		row += buffer->width;
+	}
+}
+
+void DrawMesh(game_back_buffer* buffer, vertex_buffer* vertexBuffer, index_buffer* indexBuffer, uint32 count, float R, float G, float B){
+
+	for(uint32 i = 0; i < count; i += 3){
+		vec2 point1 = vertexBuffer->vertices[indexBuffer->indices[i+0]];
+		vec2 point3 = vertexBuffer->vertices[indexBuffer->indices[i+1]];
+		vec2 point2 = vertexBuffer->vertices[indexBuffer->indices[i+2]];
+		DrawTriangle(buffer, point1, point2, point3, R, G, B);
 	}
 }
 
@@ -673,27 +707,29 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			int32 maxx = minx + Entity->PlayerWidth * TileMap->MetresToPixels;
 			int32 maxy = miny + Entity->PlayerHeight * TileMap->MetresToPixels;
 			DrawRectangle(buffer, minx, miny, maxx, maxy, 0.85f, 0.25f, 0.3f);
-			DrawRectangle(buffer, 0, buffer->height/2, buffer->width, buffer->height/2+1, 0.8f, 0.2, 0.3f);
-			DrawRectangle(buffer, buffer->width/2, 0, buffer->width/2+1, buffer->height, 0.8f, 0.2, 0.3f);
+			// DrawRectangle(buffer, 0, buffer->height/2, buffer->width, buffer->height/2+1, 0.8f, 0.2, 0.3f);
+			// DrawRectangle(buffer, buffer->width/2, 0, buffer->width/2+1, buffer->height, 0.8f, 0.2, 0.3f);
 
 
 			// DrawBitmap(buffer, &GameState->BMPPixels, buffer->width/2.f - GameState->BMPPixels.Width/2, buffer->height/2.f - GameState->BMPPixels.Height/2);
 		}
 	}
+	vertex_buffer vertexBuffer ={};
+	index_buffer indexBuffer = {};
 
-	vec2 p1 = {0.1f, 0.1f};
-	vec2 p2 = {0.45f,0.5f};
-	vec2 p3 = {0.3f, 0.9f};
-	vec2 p4 = {0.8f, 0.1f};
-	vec2 p5 = {0.55f,0.4f};
-	vec2 p6 = {0.9f, 0.9f};
+	vertexBuffer.vertices[0] = { 0.25f, 0.25f}; 
+	vertexBuffer.vertices[1] = { 0.75f, 0.25f};
+	vertexBuffer.vertices[2] = { 0.75f, 0.75f};
+	vertexBuffer.vertices[3] = { 0.25f, 0.75f};
 
-	MapPointToScreen(buffer, p1);
-	MapPointToScreen(buffer, p2);
-	MapPointToScreen(buffer, p3);
-	MapPointToScreen(buffer, p4);
-	MapPointToScreen(buffer, p5);
-	MapPointToScreen(buffer, p6);
-	DrawTriangle(buffer, p1, p2, p3, 0.84f, 0.2f, 0.3f);
-	DrawTriangle(buffer, p4, p5, p6, 0.84f, 0.66f, 0.2f);
+	for (int i = 0; i < 6; i++){
+		MapPointToScreen(buffer, vertexBuffer.vertices[i]);
+	}
+	indexBuffer.indices[0] = 0;
+	indexBuffer.indices[1] = 1;
+	indexBuffer.indices[2] = 2;
+	indexBuffer.indices[3] = 0;
+	indexBuffer.indices[4] = 2;
+	indexBuffer.indices[5] = 3;
+	DrawMesh(buffer, &vertexBuffer, &indexBuffer, 6, 0.8f, 0.2f, 0.34f);
 }
