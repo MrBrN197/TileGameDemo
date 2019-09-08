@@ -354,7 +354,7 @@ void DrawLine(game_back_buffer* buffer, vec2& pos1, vec2 pos2, float R, float G,
 	}
 }
 
-void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, float G, float B){
+void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, float R, float G, float B){
 
 	// ASSERT((p1.x != p2.x) && (p1.x != p3.x) && (p2.x != p3.x));
 	// ASSERT((p1.y != p2.y) && (p1.y != p3.y) && (p2.y != p3.y));
@@ -368,22 +368,22 @@ void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, 
 	ASSERT(!((p1.x == p3.x) && (p1.y == p3.y)));
 	ASSERT(!((p2.x == p3.x) && (p2.y == p3.y)));
 
-	vec2* v1 = &p1;
-	vec2* v2 = &p2;
-	vec2* v3 = &p3;
+	vec3* v1 = &p1;
+	vec3* v2 = &p2;
+	vec3* v3 = &p3;
 
 	if(v2->y < v1->y){
-		vec2* temp = v2;
+		vec3* temp = v2;
 		v2 = v1;
 		v1 = temp;
 	}
 	if(v3->y < v2->y){
-		vec2* temp = v3;
+		vec3* temp = v3;
 		v3 = v2; 
 		v2 = temp;
 	}
 	if(v2->y < v1->y){
-		vec2* temp = v2;
+		vec3* temp = v2;
 		v2 = v1; 
 		v1 = temp;
 	}
@@ -441,7 +441,7 @@ void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, 
 	float Y = v2->y;  // Optimize Get NewHalfPoint
 	float d12 = (v2->y - v1->y);
 	float X = v1->x + d12 * m13;
-	vec2 secondHalfPoint = vec2{X, Y};
+	vec3 secondHalfPoint = vec3{X, Y};
 
 	yStart = Ceil(secondHalfPoint.y - 0.5f);
 	yEnd = Ceil(v3->y -0.5f);
@@ -480,12 +480,12 @@ void DrawTriangle(game_back_buffer* buffer, vec2 p1, vec2 p2, vec2 p3, float R, 
 	}
 }
 
-void DrawMesh(game_back_buffer* buffer, vertex_buffer* vertexBuffer, index_buffer* indexBuffer, uint32 count, float R, float G, float B){
+void DrawMesh(game_back_buffer* buffer, vertex_buffer_3d* vertexBuffer, index_buffer* indexBuffer, uint32 count, float R, float G, float B){
 
 	for(uint32 i = 0; i < count; i += 3){
-		vec2 point1 = vertexBuffer->vertices[indexBuffer->indices[i+0]];
-		vec2 point3 = vertexBuffer->vertices[indexBuffer->indices[i+1]];
-		vec2 point2 = vertexBuffer->vertices[indexBuffer->indices[i+2]];
+		vec3 point1 = vertexBuffer->vertices[indexBuffer->indices[i+0]];
+		vec3 point3 = vertexBuffer->vertices[indexBuffer->indices[i+1]];
+		vec3 point2 = vertexBuffer->vertices[indexBuffer->indices[i+2]];
 		DrawTriangle(buffer, point1, point2, point3, R, G, B);
 	}
 }
@@ -500,12 +500,33 @@ void ClearBuffer(game_back_buffer* buffer){
 	}
 }
 
-void MapPointToScreen(game_back_buffer* buffer, vec2& point){
-	ASSERT(point.x >= 0.f &&  point.x <= 1.0f);
-	ASSERT(point.y >= 0.f &&  point.y <= 1.0f);
+void NDCToScreen(game_back_buffer* buffer, vec3& point){
+	ASSERT(point.x >= -1.f &&  point.x <= 1.0f);
+	ASSERT(point.y >= -1.f &&  point.y <= 1.0f);
 
-	point.x *= buffer->width;
-	point.y = (1 - point.y) * buffer->height;
+	point.x = (point.x + 1)/2.f *  buffer->width;
+	point.y = (1 - point.y)/2.f * buffer->height;
+}
+
+void PerspectiveProjection(vertex_buffer_3d& vertexBuffer, float angle, float n, float f, float aspect_ratio = 1.f){
+
+	float A = -(f+n)/(f-n);
+	float B = -2*f*n/(f-n);
+	float a = 1.f/tan(angle/180.f * PI);
+	float b = 1.f/tan(angle/180.f * PI) * aspect_ratio;
+
+	for(int i = 0; i < vertexBuffer.count; i++){
+		vec3& vertex = vertexBuffer.vertices[i];
+		float w = -vertex.z;
+		vertex.x = (vertex.x * a)/w;
+		vertex.y = (vertex.y * b)/w;
+		vertex.z = (vertex.z * A + B)/w;
+	}
+}
+
+void VertexBufferAddVertex(vertex_buffer_3d& vertexBuffer, vec3 vertex){
+	vertexBuffer.vertices[vertexBuffer.count] = vertex; 
+	vertexBuffer.count++;
 }
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
@@ -714,22 +735,23 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			// DrawBitmap(buffer, &GameState->BMPPixels, buffer->width/2.f - GameState->BMPPixels.Width/2, buffer->height/2.f - GameState->BMPPixels.Height/2);
 		}
 	}
-	vertex_buffer vertexBuffer ={};
+	vertex_buffer_3d vertexBuffer ={};
 	index_buffer indexBuffer = {};
 
-	vertexBuffer.vertices[0] = { 0.25f, 0.25f}; 
-	vertexBuffer.vertices[1] = { 0.75f, 0.25f};
-	vertexBuffer.vertices[2] = { 0.75f, 0.75f};
-	vertexBuffer.vertices[3] = { 0.25f, 0.75f};
+	VertexBufferAddVertex(vertexBuffer, { -0.9f,-0.9f, -2.5f}); 
+	VertexBufferAddVertex(vertexBuffer, { 0.9f,-0.9f, -2.5f});
+	VertexBufferAddVertex(vertexBuffer, { 0.9f, 0.9f, -2.5f});
+	VertexBufferAddVertex(vertexBuffer, {-0.9f, 0.9f, -2.5f});
 
-	for (int i = 0; i < 6; i++){
-		MapPointToScreen(buffer, vertexBuffer.vertices[i]);
-	}
 	indexBuffer.indices[0] = 0;
 	indexBuffer.indices[1] = 1;
 	indexBuffer.indices[2] = 2;
 	indexBuffer.indices[3] = 0;
 	indexBuffer.indices[4] = 2;
 	indexBuffer.indices[5] = 3;
+	PerspectiveProjection(vertexBuffer, 30, 2, 5);
+	for (int i = 0; i < 6; i++){
+		NDCToScreen(buffer, vertexBuffer.vertices[i]);
+	}
 	DrawMesh(buffer, &vertexBuffer, &indexBuffer, 6, 0.8f, 0.2f, 0.34f);
 }

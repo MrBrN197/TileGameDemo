@@ -133,6 +133,10 @@ struct index_buffer{
 struct vertex_buffer{
 	vec2 vertices[MAX_VERTEX_COUNT];
 };
+struct vertex_buffer_3d{
+	vec3 vertices[MAX_VERTEX_COUNT];
+	uint32 count;
+};
 
 struct game_state {
 	world *World;
