@@ -98,3 +98,14 @@ real32 dot(vec3 a, vec3 b){
     real32 Result = (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
     return Result;
 }
+
+vec3 cross(vec3 a, vec3 b){
+    real32 x = (a.y * b.z) - (a.z * b.y);
+    real32 y = (a.x * b.z) - (a.z * b.x);
+    real32 z = (a.x * b.y) - (a.y * b.x);
+    return {x, y, z};
+}
+
+float DegreesToRadians(float angle){
+    return angle/180.f * PI;
+}

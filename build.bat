@@ -16,7 +16,7 @@ rem (x86 Build) cl %commonCompilerFlags% .\src\Win32.cpp /link -subsystem:window
 
 
 PUSHD ".\build\"
-rm -f *.pdb
+REM rm -f *.pdb
 rm -f *.obj
 echo WAITING FOR PDB > lock.tmp
 cl %CommonCompilerFlags% /LDd ..\src\Game.cpp  /link /PDB:game%random%.pdb /EXPORT:GameUpdateAndRender /EXPORT:GameGetSoundSamples user32.lib

@@ -574,6 +574,12 @@ static void Win32ProcessPendingMessages(game_controller_input *keyboardControlle
 	while(PeekMessage(&message, NULL, NULL, NULL, PM_REMOVE)){
 		switch (message.message)
 		{
+		case WM_LBUTTONDBLCLK:
+			OutputDebugStringA("MOUSE DOUBLE CLICK\n");
+		case WM_LBUTTONDOWN:
+			OutputDebugStringA("MOUSE BUTTON DOWN\n");
+		break;
+		break;
 		case WM_KEYUP:
 		case WM_KEYDOWN:
 		case WM_SYSKEYUP:

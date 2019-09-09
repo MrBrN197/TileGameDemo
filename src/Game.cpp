@@ -354,7 +354,13 @@ void DrawLine(game_back_buffer* buffer, vec2& pos1, vec2 pos2, float R, float G,
 	}
 }
 
-void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, float R, float G, float B){
+void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, const vec3& color){
+
+	// Culling 
+	vec3 normal = cross(p2 - p1, p3 - p1);
+	if(dot(normal, {0, 0, 1}) < 0.0){
+		return;
+	}
 
 	// ASSERT((p1.x != p2.x) && (p1.x != p3.x) && (p2.x != p3.x));
 	// ASSERT((p1.y != p2.y) && (p1.y != p3.y) && (p2.y != p3.y));
@@ -428,9 +434,9 @@ void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, float R, 
 
 		uint32* pixels = row + xStart;
 		for (int x = xStart; x < xEnd; x++){
-			int32 r = R * 255;
-			int32 g = G * 255;
-			int32 b = B * 255;
+			int32 r = color.x * 255;
+			int32 g = color.y * 255;
+			int32 b = color.z * 255;
 			*pixels++ = ((255 << 24) | (r << 16) | (g << 8) | b);
 		}
 		row += buffer->width;
@@ -445,13 +451,7 @@ void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, float R, 
 
 	yStart = Ceil(secondHalfPoint.y - 0.5f);
 	yEnd = Ceil(v3->y -0.5f);
-	float m23;
-	if(m23  == 0.f){
-		// m23 = 0.f;
-		ASSERT(false);
-	}else{
-		m23 = (v3->x - v2->x)/(v3->y - v2->y);
-	}
+	float m23 = (v3->x - v2->x)/(v3->y - v2->y);
 
 	for (int y = yStart; y < yEnd; y++)
 	{
@@ -471,9 +471,9 @@ void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, float R, 
 		uint32* pixels = row + xStart;
 		for (int x = xStart; x < xEnd; x++)
 		{
-			int32 r = R * 128;
-			int32 g = G * 128;
-			int32 b = B * 128;
+			int32 r = color.x * 255;
+			int32 g = color.y * 255;
+			int32 b = color.z * 255;
 			*pixels++ = ((255 << 24) | (r << 16) | (g << 8) | b);
 		}
 		row += buffer->width;
@@ -482,11 +482,26 @@ void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, float R, 
 
 void DrawMesh(game_back_buffer* buffer, vertex_buffer_3d* vertexBuffer, index_buffer* indexBuffer, uint32 count, float R, float G, float B){
 
-	for(uint32 i = 0; i < count; i += 3){
-		vec3 point1 = vertexBuffer->vertices[indexBuffer->indices[i+0]];
-		vec3 point3 = vertexBuffer->vertices[indexBuffer->indices[i+1]];
-		vec3 point2 = vertexBuffer->vertices[indexBuffer->indices[i+2]];
-		DrawTriangle(buffer, point1, point2, point3, R, G, B);
+	vec3 colors[12] = {
+		{0.9f, 0.2f, 0.3f},	
+		{0.85f, 0.2f, 0.3f},	
+		{0.39f, 0.7f, 0.57f},
+		{0.29f, 0.6f, 0.47f},
+		{0.7f, 0.4f, 0.92f},	
+		{0.6f, 0.3f, 0.82f},	
+		{0.1f, 0.9f, 0.22f},	
+		{0.05f, 0.8f, 0.13f},
+		{0.1f, 0.1f, 0.1f},	
+		{0.1f, 0.1f, 0.1f},
+		{0.93f, 0.93f, 0.93f},
+		{0.93f, 0.93f, 0.93f}
+	};
+
+	for(uint32 i = 0; i < count/3; i++){
+		vec3 point1 = vertexBuffer->vertices[indexBuffer->indices[i*3+0]];
+		vec3 point3 = vertexBuffer->vertices[indexBuffer->indices[i*3+1]];
+		vec3 point2 = vertexBuffer->vertices[indexBuffer->indices[i*3+2]];
+		DrawTriangle(buffer, point1, point2, point3, colors[i]);
 	}
 }
 
@@ -494,8 +509,8 @@ void ClearBuffer(game_back_buffer* buffer){
 	uint32 *memory = (uint32*)buffer->memory;
 	for(int i = 0; i < buffer->width * buffer->height; i++){
 		uint8 r = 54;
-		uint8 g = 144;
-		uint8 b = 66;
+		uint8 g = 66;
+		uint8 b = 144;
 		*memory++ = (255 << 24) | (r << 16) | (g << 8) | b;
 	}
 }
@@ -512,8 +527,8 @@ void PerspectiveProjection(vertex_buffer_3d& vertexBuffer, float angle, float n,
 
 	float A = -(f+n)/(f-n);
 	float B = -2*f*n/(f-n);
-	float a = 1.f/tan(angle/180.f * PI);
-	float b = 1.f/tan(angle/180.f * PI) * aspect_ratio;
+	float a = 1.f/(tan(DegreesToRadians(angle/2)) * aspect_ratio);
+	float b = 1.f/tan(DegreesToRadians(angle/2));
 
 	for(int i = 0; i < vertexBuffer.count; i++){
 		vec3& vertex = vertexBuffer.vertices[i];
@@ -521,6 +536,59 @@ void PerspectiveProjection(vertex_buffer_3d& vertexBuffer, float angle, float n,
 		vertex.x = (vertex.x * a)/w;
 		vertex.y = (vertex.y * b)/w;
 		vertex.z = (vertex.z * A + B)/w;
+	}
+}
+void RotateX(vertex_buffer_3d& vertexBuffer, float angle){
+
+	float rad = DegreesToRadians(angle);
+	double cosTheta = cosf(rad);
+	double sinTheta = sinf(rad);
+
+	for (int i = 0; i < vertexBuffer.count; i++){
+		vec3& vertex = vertexBuffer.vertices[i];
+		float y = vertex.y * cosTheta + vertex.z * -sinTheta;
+		float z = vertex.y * sinTheta + vertex.z * cosTheta;
+		vertex.y = y;
+		vertex.z = z;
+	}
+}
+
+void RotateY(vertex_buffer_3d& vertexBuffer, float angle){
+
+	float rad = DegreesToRadians(angle);
+	double cosTheta = cosf(rad);
+	double sinTheta = sinf(rad);
+
+	for (int i = 0; i < vertexBuffer.count; i++){
+		vec3& vertex = vertexBuffer.vertices[i];
+		float x = vertex.x * cosTheta + vertex.z * sinTheta;
+		float z = vertex.x * -sinTheta + vertex.z * cosTheta;
+		vertex.x = x;
+		vertex.z = z;
+	}
+}
+
+void RotateZ(vertex_buffer_3d& vertexBuffer, float angle){
+
+	float rad = DegreesToRadians(angle);
+	double cosTheta = cosf(rad);
+	double sinTheta = sinf(rad);
+
+	for (int i = 0; i < vertexBuffer.count; i++){
+		vec3& vertex = vertexBuffer.vertices[i];
+		float x = vertex.x * cosTheta + vertex.y * -sinTheta;
+		float y = vertex.x * sinTheta + vertex.y * cosTheta;
+		vertex.x = x;
+		vertex.y = y;
+	}
+}
+
+void Translate(vertex_buffer_3d& vertexBuffer, vec3 translation){
+	for (int i = 0; i < vertexBuffer.count; i++){
+		vec3& vertex = vertexBuffer.vertices[i];
+		vertex.x += translation.x;
+		vertex.y += translation.y;
+		vertex.z += translation.z;
 	}
 }
 
@@ -738,10 +806,16 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	vertex_buffer_3d vertexBuffer ={};
 	index_buffer indexBuffer = {};
 
-	VertexBufferAddVertex(vertexBuffer, { -0.9f,-0.9f, -2.5f}); 
-	VertexBufferAddVertex(vertexBuffer, { 0.9f,-0.9f, -2.5f});
-	VertexBufferAddVertex(vertexBuffer, { 0.9f, 0.9f, -2.5f});
-	VertexBufferAddVertex(vertexBuffer, {-0.9f, 0.9f, -2.5f});
+	VertexBufferAddVertex(vertexBuffer, {-1.f,-1.f, 1.f});
+	VertexBufferAddVertex(vertexBuffer, { 1.f,-1.f, 1.f});
+	VertexBufferAddVertex(vertexBuffer, { 1.f, 1.f, 1.f});
+	VertexBufferAddVertex(vertexBuffer, {-1.f, 1.f, 1.f});
+
+	VertexBufferAddVertex(vertexBuffer, {-1.f,-1.f,-1.f}); 
+	VertexBufferAddVertex(vertexBuffer, { 1.f,-1.f,-1.f});
+	VertexBufferAddVertex(vertexBuffer, { 1.f, 1.f,-1.f});
+	VertexBufferAddVertex(vertexBuffer, {-1.f, 1.f,-1.f});
+
 
 	indexBuffer.indices[0] = 0;
 	indexBuffer.indices[1] = 1;
@@ -749,9 +823,50 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	indexBuffer.indices[3] = 0;
 	indexBuffer.indices[4] = 2;
 	indexBuffer.indices[5] = 3;
-	PerspectiveProjection(vertexBuffer, 30, 2, 5);
-	for (int i = 0; i < 6; i++){
+
+	indexBuffer.indices[6]  = 5;
+	indexBuffer.indices[7]  = 4;
+	indexBuffer.indices[8]  = 7;
+	indexBuffer.indices[9]  = 5;
+	indexBuffer.indices[10] = 7;
+	indexBuffer.indices[11] = 6;
+
+	indexBuffer.indices[12] = 4;
+	indexBuffer.indices[13] = 0;
+	indexBuffer.indices[14] = 3;
+	indexBuffer.indices[15] = 4;
+	indexBuffer.indices[16] = 3;
+	indexBuffer.indices[17] = 7;
+
+	indexBuffer.indices[18] = 1;
+	indexBuffer.indices[19] = 5;
+	indexBuffer.indices[20] = 6;
+	indexBuffer.indices[21] = 1;
+	indexBuffer.indices[22] = 6;
+	indexBuffer.indices[23] = 2;
+
+	indexBuffer.indices[24] = 3;
+	indexBuffer.indices[25] = 2;
+	indexBuffer.indices[26] = 6;
+	indexBuffer.indices[27] = 3;
+	indexBuffer.indices[28] = 6;
+	indexBuffer.indices[29] = 7;
+
+	indexBuffer.indices[30] = 1;
+	indexBuffer.indices[31] = 0;
+	indexBuffer.indices[32] = 4;
+	indexBuffer.indices[33] = 1;
+	indexBuffer.indices[34] = 4;
+	indexBuffer.indices[35] = 5;
+
+	ClearBuffer(buffer);
+	static float angle = 0;
+	angle += 2.01f;
+	RotateY(vertexBuffer, angle);
+	Translate(vertexBuffer, {0.f, 0.f, -4.0f});
+	PerspectiveProjection(vertexBuffer, 85, 1, 10, buffer->width/float(buffer->height));
+	for (int i = 0; i < vertexBuffer.count; i++){
 		NDCToScreen(buffer, vertexBuffer.vertices[i]);
 	}
-	DrawMesh(buffer, &vertexBuffer, &indexBuffer, 6, 0.8f, 0.2f, 0.34f);
+	DrawMesh(buffer, &vertexBuffer, &indexBuffer, 36, 0.8f, 0.2f, 0.34f);
 }
