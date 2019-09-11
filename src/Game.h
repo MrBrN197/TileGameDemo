@@ -96,9 +96,9 @@ struct debug_read_file_result
 	void *contents;
 };
 
-#include "Game_Math.h"
+#include "Math/Math.h"
 #include "GameTile.h"
-#include "GameIntrinsics.h"
+#include "Intrinsics.h"
 
 struct world{
 	tile_map *TileMap;
@@ -125,22 +125,36 @@ struct entity{
 	real32 PlayerHeight;
 };
 
-#define MAX_INDEX_COUNT 256
-#define MAX_VERTEX_COUNT 64
 struct index_buffer{
-	uint32 indices[MAX_INDEX_COUNT];
+	void* Indices;
+	uint32 Count;
 };
 struct vertex_buffer{
-	vec2 vertices[MAX_VERTEX_COUNT];
+	void* Vertices;
 };
 struct vertex_buffer_3d{
-	vec3 vertices[MAX_VERTEX_COUNT];
-	uint32 count;
+	void *Vertices;
+	uint32 Count;
 };
+
+#define MAX_INDEX_BUFFERS 4
+#define MAX_VERTEX_BUFFERS 4
+#define MAX_RENDER_TARGET_SIZE 1 << 11  // 4096 bytes
+struct graphics_context{
+	bool32 Initialized;
+    vertex_buffer_3d *VertexBuffers;
+    index_buffer *IndexBuffers;
+	uint32 VertexBufferCount;
+	uint32 IndexBufferCount;
+	void* RenderTarget;
+};
+
 
 struct game_state {
 	world *World;
 	tile_map_position CameraP;
+
+	graphics_context* GraphicsContext;
 
 	uint32 EnitytCameraFollowsIndex;
 	entity Entities[256];
@@ -158,7 +172,7 @@ struct game_state {
 
 
 struct thread_context{
-	int placeholder;
+	int Placeholder;
 };
 
 //TODO : services that the platform layer provides to the game

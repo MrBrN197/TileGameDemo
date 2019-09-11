@@ -211,48 +211,6 @@ MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
 	NewPlayerPos.Offset += PlayerDelta;
 	NewPlayerPos = RecanonicalizePosition(GameState->World->TileMap, NewPlayerPos);
 
-#if 0
-	// COLLISION
-	tile_map_position CollisionDirection = {};
-	tile_map_position LeftEdge = NewPlayerPos;
-	tile_map_position RightEdge = NewPlayerPos;
-	LeftEdge.Offset.x += Entity->PlayerWidth/2;
-	RightEdge.Offset.x -= Entity->PlayerWidth/2;
-	LeftEdge = RecanonicalizePosition(GameState->World->TileMap, LeftEdge);
-	RightEdge = RecanonicalizePosition(GameState->World->TileMap, RightEdge);
-
-	
-	bool Collided = false;
-
-	if(!IsWorldPointEmpty(GameState->World->TileMap, LeftEdge)){
-		CollisionDirection = LeftEdge;
-		Collided = true;
-	}
-	if(!IsWorldPointEmpty(GameState->World->TileMap, RightEdge)){
-		CollisionDirection = RightEdge;
-		Collided = true;
-	}
-
-	if(!Collided){
-		Entity->Position = NewPlayerPos;
-	}else{
-		vec2 Normal = {0, 0};
-		if(CollisionDirection.AbsTileX < Entity->Position.AbsTileX){
-			Normal = {1, 0};
-		}if(CollisionDirection.AbsTileX > Entity->Position.AbsTileX){
-			Normal = {-1, 0};
-		}
-		if(CollisionDirection.AbsTileY < Entity->Position.AbsTileY){
-			Normal = {0, 1};
-		}
-		if(CollisionDirection.AbsTileY > Entity->Position.AbsTileY){
-			Normal = {0, -1};
-		}
-		ASSERT(!((Normal.x == 0) && (Normal.y == 0)));
-		Entity->PlayerVel = Entity->PlayerVel - (2 * dot(Entity->PlayerVel, Normal)) * Normal;  // V + (2*(N*V))*N
-	}
-	Entity->PlayerVel += acceleration * dt;
-#else
 	Entity->PlayerVel += acceleration * dt;  // Note: When should this be done?
 
 	real32 TileSideInMetres = GameState->World->TileMap->TileSideInMetres;
@@ -311,7 +269,6 @@ MovePlayer(game_state *GameState, entity *Entity, vec2 acceleration, real32 dt){
 		tRemaining -= (tMin * tRemaining);
 	}
 	ASSERT(tRemaining == 0.0f);
-#endif
 }
 
 void DrawPoint(game_back_buffer* buffer, vec2& pos, int size){
@@ -356,12 +313,13 @@ void DrawLine(game_back_buffer* buffer, vec2& pos1, vec2 pos2, float R, float G,
 
 void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, const vec3& color){
 
-	// Culling 
+	// TODO: Move Culling To ClipSpace Stage 
 	vec3 normal = cross(p2 - p1, p3 - p1);
-	if(dot(normal, {0, 0, 1}) < 0.0){
+	if(dot(normal, {0, 0, 1}) > 0.0){
 		return;
 	}
 
+	// TODO: Handle invalid triangles properly
 	// ASSERT((p1.x != p2.x) && (p1.x != p3.x) && (p2.x != p3.x));
 	// ASSERT((p1.y != p2.y) && (p1.y != p3.y) && (p2.y != p3.y));
 
@@ -480,38 +438,21 @@ void DrawTriangle(game_back_buffer* buffer, vec3 p1, vec3 p2, vec3 p3, const vec
 	}
 }
 
-void DrawMesh(game_back_buffer* buffer, vertex_buffer_3d* vertexBuffer, index_buffer* indexBuffer, uint32 count, float R, float G, float B){
-
-	vec3 colors[12] = {
-		{0.9f, 0.2f, 0.3f},	
-		{0.85f, 0.2f, 0.3f},	
-		{0.39f, 0.7f, 0.57f},
-		{0.29f, 0.6f, 0.47f},
-		{0.7f, 0.4f, 0.92f},	
-		{0.6f, 0.3f, 0.82f},	
-		{0.1f, 0.9f, 0.22f},	
-		{0.05f, 0.8f, 0.13f},
-		{0.1f, 0.1f, 0.1f},	
-		{0.1f, 0.1f, 0.1f},
-		{0.93f, 0.93f, 0.93f},
-		{0.93f, 0.93f, 0.93f}
-	};
-
-	for(uint32 i = 0; i < count/3; i++){
-		vec3 point1 = vertexBuffer->vertices[indexBuffer->indices[i*3+0]];
-		vec3 point3 = vertexBuffer->vertices[indexBuffer->indices[i*3+1]];
-		vec3 point2 = vertexBuffer->vertices[indexBuffer->indices[i*3+2]];
-		DrawTriangle(buffer, point1, point2, point3, colors[i]);
-	}
+vertex_buffer_3d* GetVertexBuffer(graphics_context *GraphicsContext, uint32 BufferID){
+	ASSERT(BufferID < GraphicsContext->VertexBufferCount);
+	return &GraphicsContext->VertexBuffers[BufferID];
+}
+index_buffer* GetIndexBuffer(graphics_context *GraphicsContext, uint32 BufferID){
+	ASSERT(BufferID < GraphicsContext->IndexBufferCount);
+	return &GraphicsContext->IndexBuffers[BufferID];
 }
 
-void ClearBuffer(game_back_buffer* buffer){
-	uint32 *memory = (uint32*)buffer->memory;
-	for(int i = 0; i < buffer->width * buffer->height; i++){
-		uint8 r = 54;
-		uint8 g = 66;
-		uint8 b = 144;
-		*memory++ = (255 << 24) | (r << 16) | (g << 8) | b;
+void FillRenderTarget(graphics_context *GraphicsContext, uint32 VertexBufferID){
+	vertex_buffer_3d* VertexBuffer = GetVertexBuffer(GraphicsContext, VertexBufferID);
+	// TODO: Clear RenderTarget
+	vec3* RenderTarget = (vec3*)GraphicsContext->RenderTarget;
+	for(int i = 0; i < VertexBuffer->Count / sizeof(vec3); i++){
+		*RenderTarget++ = *((vec3*)VertexBuffer->Vertices + i);
 	}
 }
 
@@ -521,80 +462,151 @@ void NDCToScreen(game_back_buffer* buffer, vec3& point){
 
 	point.x = (point.x + 1)/2.f *  buffer->width;
 	point.y = (1 - point.y)/2.f * buffer->height;
+
+	ASSERT(point.x >= 0)
+	ASSERT(point.y >= 0)
+	ASSERT(point.x <= buffer->width);
+	ASSERT(point.y <= buffer->height);
 }
 
-void PerspectiveProjection(vertex_buffer_3d& vertexBuffer, float angle, float n, float f, float aspect_ratio = 1.f){
+void DrawMesh(graphics_context *GraphicsContext, game_back_buffer* Buffer, uint32 VertexBufferID, uint32 IndexBufferID, uint32 Count){
+	// TODO: Get Attributes From Layout
 
+	vec3 Colors[12] = {
+		{0.8f, 0.2f, 0.3f},	
+		{0.75f, 0.2f, 0.3f},	
+		{0.39f, 0.7f, 0.57f},
+		{0.29f, 0.6f, 0.47f},
+		{0.7f, 0.4f, 0.92f},	
+		{0.6f, 0.3f, 0.82f},	
+		{0.1f, 0.23f, 0.72f},	
+		{0.05f, 0.26f, 0.83f},
+		{0.2f, 0.2f, 0.2f},
+		{0.25f, 0.25f, 0.25f},
+		{0.93f, 0.63f, 0.23f},
+		{0.93f, 0.73f, 0.23f}
+	};
+
+	// TODO: Convert To Binding Mechanism
+	// vertex_buffer_3d* VertexBuffer = GetVertexBuffer(GraphicsContext, VertexBufferID);
+	vec3* RenderTarget = (vec3*)GraphicsContext->RenderTarget;
+	index_buffer* IndexBuffer = GetIndexBuffer(GraphicsContext, IndexBufferID);
+
+	ASSERT(Count <= IndexBuffer->Count/sizeof(uint32));
+	ASSERT(Count % 3 == 0);
+	for(uint32 i = 0; i < Count/3; i++){
+		// const vec3* Point1 = (vec3*)VertexBuffer->Vertices[*(((uint32*)IndexBuffer->Indices) + (i*3+0))];
+
+		int triplet = i*3;
+		uint32 index1 = *((uint32*)IndexBuffer->Indices + (triplet + 0));
+		uint32 index2 = *((uint32*)IndexBuffer->Indices + (triplet + 1));
+		uint32 index3 = *((uint32*)IndexBuffer->Indices + (triplet + 2));
+
+		// don't ovewrite render target vertices
+		// they will be indexed to again by other triangles
+		vec3 Point1 = *(RenderTarget + index1);
+		vec3 Point2 = *(RenderTarget + index2);
+		vec3 Point3 = *(RenderTarget + index3);
+
+		NDCToScreen(Buffer, Point1);
+		NDCToScreen(Buffer, Point2);
+		NDCToScreen(Buffer, Point3);
+
+		DrawTriangle(Buffer, Point1, Point2, Point3, Colors[i]);
+	}
+}
+
+void ClearBuffer(game_back_buffer* buffer){
+	uint32 *memory = (uint32*)buffer->memory;
+	for(int i = 0; i < buffer->width * buffer->height; i++){
+		uint8 r = 104;
+		uint8 g = 89;
+		uint8 b = 94;
+		*memory++ = (255 << 24) | (r << 16) | (g << 8) | b;
+	}
+}
+
+
+void PerspectiveProjection(graphics_context *GraphicsContext, uint32 VertexBufferID, float angle, float n, float f, float aspect_ratio = 1.f){
+
+	// TODO: 
 	float A = -(f+n)/(f-n);
 	float B = -2*f*n/(f-n);
 	float a = 1.f/(tan(DegreesToRadians(angle/2)) * aspect_ratio);
 	float b = 1.f/tan(DegreesToRadians(angle/2));
 
-	for(int i = 0; i < vertexBuffer.count; i++){
-		vec3& vertex = vertexBuffer.vertices[i];
-		float w = -vertex.z;
-		vertex.x = (vertex.x * a)/w;
-		vertex.y = (vertex.y * b)/w;
-		vertex.z = (vertex.z * A + B)/w;
-	}
-}
-void RotateX(vertex_buffer_3d& vertexBuffer, float angle){
+	vertex_buffer_3d* VertexBuffer = GetVertexBuffer(GraphicsContext, VertexBufferID);
+	vec3* RenderTarget = (vec3*)GraphicsContext->RenderTarget;
 
-	float rad = DegreesToRadians(angle);
-	double cosTheta = cosf(rad);
-	double sinTheta = sinf(rad);
-
-	for (int i = 0; i < vertexBuffer.count; i++){
-		vec3& vertex = vertexBuffer.vertices[i];
-		float y = vertex.y * cosTheta + vertex.z * -sinTheta;
-		float z = vertex.y * sinTheta + vertex.z * cosTheta;
-		vertex.y = y;
-		vertex.z = z;
+	for(int i = 0; i < VertexBuffer->Count/sizeof(vec3); i++){
+		float w = -RenderTarget->z;
+		RenderTarget->x = (RenderTarget->x * a)/w;
+		RenderTarget->y = (RenderTarget->y * b)/w;
+		RenderTarget->z = (RenderTarget->z * A + B)/w;
+		RenderTarget++;
 	}
 }
 
-void RotateY(vertex_buffer_3d& vertexBuffer, float angle){
+void InputAssemble(graphics_context *GraphicsContext, uint32 VertexBufferID, uint32 IndexBufferID){
 
-	float rad = DegreesToRadians(angle);
-	double cosTheta = cosf(rad);
-	double sinTheta = sinf(rad);
+}
+void VertexTransform(graphics_context *GraphicsContext, uint32 VertexBufferID, const mat4& transform){
 
-	for (int i = 0; i < vertexBuffer.count; i++){
-		vec3& vertex = vertexBuffer.vertices[i];
-		float x = vertex.x * cosTheta + vertex.z * sinTheta;
-		float z = vertex.x * -sinTheta + vertex.z * cosTheta;
-		vertex.x = x;
-		vertex.z = z;
+	// TODO: buffer layout
+	vec3 *RenderTarget = (vec3*)GraphicsContext->RenderTarget;
+	vertex_buffer_3d *VertexBuffer = GetVertexBuffer(GraphicsContext, VertexBufferID);
+
+	for(int i = 0;i < VertexBuffer->Count/sizeof(vec3);i++){
+		vec3 &vertex = *((vec3*)RenderTarget + i);
+		vertex = transform.multiply(vertex);
 	}
 }
 
-void RotateZ(vertex_buffer_3d& vertexBuffer, float angle){
+uint32 CreateVertexBuffer(game_state* GameState, uint32 Size, void* Data){
+	uint32_t VertexBufferID;
+	graphics_context *GraphicsContext = GameState->GraphicsContext;
+	memory_arena& MemoryArena = GameState->MemoryArena;
 
-	float rad = DegreesToRadians(angle);
-	double cosTheta = cosf(rad);
-	double sinTheta = sinf(rad);
+	ASSERT(GraphicsContext->Initialized);
 
-	for (int i = 0; i < vertexBuffer.count; i++){
-		vec3& vertex = vertexBuffer.vertices[i];
-		float x = vertex.x * cosTheta + vertex.y * -sinTheta;
-		float y = vertex.x * sinTheta + vertex.y * cosTheta;
-		vertex.x = x;
-		vertex.y = y;
+	vertex_buffer_3d* VertexBuffer = (GraphicsContext->VertexBuffers + GraphicsContext->VertexBufferCount);
+	VertexBufferID = GraphicsContext->VertexBufferCount++;
+	VertexBuffer->Count = Size;
+
+	uint8* Memory = PushArray(MemoryArena, Size, uint8);
+	VertexBuffer->Vertices = Memory;
+	if(Data){
+		uint8* MemoryIterator = Memory;
+		uint8* DataIterator = (uint8*)Data;
+		for(int i = 0; i < Size; i++){
+			*MemoryIterator++ = *DataIterator++;
+		}
 	}
-}
 
-void Translate(vertex_buffer_3d& vertexBuffer, vec3 translation){
-	for (int i = 0; i < vertexBuffer.count; i++){
-		vec3& vertex = vertexBuffer.vertices[i];
-		vertex.x += translation.x;
-		vertex.y += translation.y;
-		vertex.z += translation.z;
+	return VertexBufferID;
+}
+uint32 CreateIndexBuffer(game_state* GameState, uint32 Size, void* Data){
+	uint32_t IndexBufferID;
+	graphics_context *GraphicsContext = GameState->GraphicsContext;
+	memory_arena& MemoryArena = GameState->MemoryArena;
+
+	ASSERT(GraphicsContext->Initialized);
+
+	index_buffer* IndexBuffer = (GraphicsContext->IndexBuffers + GraphicsContext->IndexBufferCount);
+	IndexBufferID = GraphicsContext->IndexBufferCount++;
+	IndexBuffer->Count = Size;
+
+	uint8* Memory = PushArray(MemoryArena, Size, uint8);
+	IndexBuffer->Indices = Memory;
+	if(Data){
+		uint8* MemoryIterator = Memory;
+		uint8* DataIterator = (uint8*)Data;
+		for(int i = 0; i < Size; i++){
+			*MemoryIterator++ = *DataIterator++;
+		}
 	}
-}
 
-void VertexBufferAddVertex(vertex_buffer_3d& vertexBuffer, vec3 vertex){
-	vertexBuffer.vertices[vertexBuffer.count] = vertex; 
-	vertexBuffer.count++;
+	return IndexBufferID;
 }
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
@@ -672,6 +684,38 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		GameState->CameraP.AbsTileX = 9;
 		GameState->CameraP.AbsTileY = 3;
 		GameState->CameraP.Offset = {0.f, 0.f};
+
+		
+		// Graphics Context
+		graphics_context GraphicsContext = {};
+		GraphicsContext.VertexBuffers = PushArray(GameState->MemoryArena, MAX_VERTEX_BUFFERS, vertex_buffer_3d);
+		GraphicsContext.IndexBuffers = PushArray(GameState->MemoryArena, MAX_INDEX_BUFFERS, index_buffer);
+		GameState->GraphicsContext = PushStruct(GameState->MemoryArena, graphics_context);
+		GraphicsContext.RenderTarget = PushArray(GameState->MemoryArena, MAX_RENDER_TARGET_SIZE, uint8);
+		GraphicsContext.Initialized = true;
+		*GameState->GraphicsContext = GraphicsContext;
+
+		float vertices[3 * 8] = {
+			-1.f,-1.f, 1.f,
+			 1.f,-1.f, 1.f,
+			 1.f, 1.f, 1.f,
+			-1.f, 1.f, 1.f,
+			-1.f,-1.f,-1.f, 
+			 1.f,-1.f,-1.f,
+			 1.f, 1.f,-1.f,
+			-1.f, 1.f,-1.f
+		};
+		unsigned int indices[36]{
+			0,1,2,0,2,3,
+			5,4,7,5,7,6,
+			4,0,3,4,3,7,
+			1,5,6,1,6,2,
+			3,2,6,3,6,7,
+			1,0,4,1,4,5
+		};
+
+		uint32 VertexBuffer = CreateVertexBuffer(GameState, sizeof(vertices), (void*)vertices);
+		uint32 IndexBuffer = CreateIndexBuffer(GameState, sizeof(indices), (void*)indices);
 
 		memory->isInitialized = true;
 	}
@@ -803,70 +847,23 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			// DrawBitmap(buffer, &GameState->BMPPixels, buffer->width/2.f - GameState->BMPPixels.Width/2, buffer->height/2.f - GameState->BMPPixels.Height/2);
 		}
 	}
-	vertex_buffer_3d vertexBuffer ={};
-	index_buffer indexBuffer = {};
-
-	VertexBufferAddVertex(vertexBuffer, {-1.f,-1.f, 1.f});
-	VertexBufferAddVertex(vertexBuffer, { 1.f,-1.f, 1.f});
-	VertexBufferAddVertex(vertexBuffer, { 1.f, 1.f, 1.f});
-	VertexBufferAddVertex(vertexBuffer, {-1.f, 1.f, 1.f});
-
-	VertexBufferAddVertex(vertexBuffer, {-1.f,-1.f,-1.f}); 
-	VertexBufferAddVertex(vertexBuffer, { 1.f,-1.f,-1.f});
-	VertexBufferAddVertex(vertexBuffer, { 1.f, 1.f,-1.f});
-	VertexBufferAddVertex(vertexBuffer, {-1.f, 1.f,-1.f});
-
-
-	indexBuffer.indices[0] = 0;
-	indexBuffer.indices[1] = 1;
-	indexBuffer.indices[2] = 2;
-	indexBuffer.indices[3] = 0;
-	indexBuffer.indices[4] = 2;
-	indexBuffer.indices[5] = 3;
-
-	indexBuffer.indices[6]  = 5;
-	indexBuffer.indices[7]  = 4;
-	indexBuffer.indices[8]  = 7;
-	indexBuffer.indices[9]  = 5;
-	indexBuffer.indices[10] = 7;
-	indexBuffer.indices[11] = 6;
-
-	indexBuffer.indices[12] = 4;
-	indexBuffer.indices[13] = 0;
-	indexBuffer.indices[14] = 3;
-	indexBuffer.indices[15] = 4;
-	indexBuffer.indices[16] = 3;
-	indexBuffer.indices[17] = 7;
-
-	indexBuffer.indices[18] = 1;
-	indexBuffer.indices[19] = 5;
-	indexBuffer.indices[20] = 6;
-	indexBuffer.indices[21] = 1;
-	indexBuffer.indices[22] = 6;
-	indexBuffer.indices[23] = 2;
-
-	indexBuffer.indices[24] = 3;
-	indexBuffer.indices[25] = 2;
-	indexBuffer.indices[26] = 6;
-	indexBuffer.indices[27] = 3;
-	indexBuffer.indices[28] = 6;
-	indexBuffer.indices[29] = 7;
-
-	indexBuffer.indices[30] = 1;
-	indexBuffer.indices[31] = 0;
-	indexBuffer.indices[32] = 4;
-	indexBuffer.indices[33] = 1;
-	indexBuffer.indices[34] = 4;
-	indexBuffer.indices[35] = 5;
 
 	ClearBuffer(buffer);
+	uint32 IndexBuffer = 0;
+	uint32 VertexBuffer = 0;
 	static float angle = 0;
-	angle += 2.01f;
-	RotateY(vertexBuffer, angle);
-	Translate(vertexBuffer, {0.f, 0.f, -4.0f});
-	PerspectiveProjection(vertexBuffer, 85, 1, 10, buffer->width/float(buffer->height));
-	for (int i = 0; i < vertexBuffer.count; i++){
-		NDCToScreen(buffer, vertexBuffer.vertices[i]);
-	}
-	DrawMesh(buffer, &vertexBuffer, &indexBuffer, 36, 0.8f, 0.2f, 0.34f);
+	angle += 5.01f;
+	FillRenderTarget(GameState->GraphicsContext, VertexBuffer);
+	mat4 rotX = mat4::RotationY(angle*0.666f);
+	mat4 rotY = mat4::RotationX(angle);
+	VertexTransform(GameState->GraphicsContext, VertexBuffer, rotX.multiply(rotY));
+	mat4 transform = mat4::translation({0, 0, -4.5f});
+	VertexTransform(GameState->GraphicsContext, VertexBuffer, transform);
+	InputAssemble(GameState->GraphicsContext, VertexBuffer, IndexBuffer);
+	PerspectiveProjection(GameState->GraphicsContext, VertexBuffer, 80 + sin(angle*0.015f) * 10, 1, 10, buffer->width/float(buffer->height));
+
+	// for (int i = 0; i < vertexBuffer.Count; i++){
+	// 	NDCToScreen(buffer, vertexBuffer.Vertices[i]);
+	// }
+	DrawMesh(GameState->GraphicsContext, buffer, VertexBuffer, IndexBuffer, 36);
 }

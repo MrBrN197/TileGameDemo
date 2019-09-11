@@ -215,7 +215,13 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND windowHandle, UINT message, WPARAM
 	{
 		OutputDebugStringA("WM_SIZE\n");
 	}break;
-	
+	case WM_LBUTTONDOWN:{
+		char mouseInfo[50];
+		int x = (int16)lParam;
+		int y = (int16)(lParam >> 16);
+		wsprintfA(mouseInfo, "MouseClick(X: %d, Y: %d)\n",  x, y);
+		OutputDebugStringA(mouseInfo);
+	}break;
 	case WM_KEYDOWN:
 	case WM_SYSKEYDOWN:
 	case WM_SYSKEYUP:
@@ -574,11 +580,6 @@ static void Win32ProcessPendingMessages(game_controller_input *keyboardControlle
 	while(PeekMessage(&message, NULL, NULL, NULL, PM_REMOVE)){
 		switch (message.message)
 		{
-		case WM_LBUTTONDBLCLK:
-			OutputDebugStringA("MOUSE DOUBLE CLICK\n");
-		case WM_LBUTTONDOWN:
-			OutputDebugStringA("MOUSE BUTTON DOWN\n");
-		break;
 		break;
 		case WM_KEYUP:
 		case WM_KEYDOWN:
@@ -736,6 +737,7 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
 	int width = WIDTH + rect.right - rect.left;
 	int height = HEIGHT + rect.bottom - rect.top;
+
 	HWND windowHandle = CreateWindowExA(
 		NULL /* WS_EX_LAYERED */,
 		windowClass.lpszClassName,
@@ -745,10 +747,10 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 		0,
 		width,
 		height,
-		0,
-		0,
+		NULL,
+		NULL,
 		hInstance,
-		0);
+		NULL);
 
 	ASSERT(windowHandle);
 
@@ -761,6 +763,7 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	sound.nChannels = 2;
 	sound.runningSamples = 0;
 	sound.bufferSize = (sound.samplesPerSecond * sound.bytesPerSample * sound.nChannels * 3);
+
 	//Load Required Libraries
 	Win32LoadDSound(windowHandle, sound.bufferSize);
 	Win32LoadXInput();
@@ -769,7 +772,6 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	globalSoundBuffer->Play(NULL, NULL, DSBPLAY_LOOPING);
 	Running = true;
 
-	
 	//Initialize Setup or back_buffer
 	Win32ResizeDIBSection(&globalBuffer, WIDTH, HEIGHT);
 
@@ -801,6 +803,7 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	gameMemory.DEBUGPlatformFreeFileMemory = DEBUGPlatformFreeFileMemory;
 	gameMemory.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
 
+	// GameState
 	game_state GameState = {};
 	GameState.toneHz = 440;
 	*(game_state*)(gameMemory.permanentStorage) = GameState;
@@ -808,8 +811,12 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	game_input input[2] = {};
 	game_input *oldInput = &input[0];
 	game_input *newInput = &input[1];
+
+	// Timing
 	QueryPerformanceFrequency(&globalPerfCountFrequency);
 	LARGE_INTEGER lastCounter = Win32GetWallClock();
+
+	// Load Game Dll
 	win32_game_code GameCode = {};
 	GameCode = Win32LoadGameCode(sourceDllFullPath, tempDllFullPath, lockPath);
 
@@ -942,7 +949,7 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 		back_buffer.memory = globalBuffer.memoryBits;
 		back_buffer.pitch = globalBuffer.pitch;
 
-		//Fill backbuffer and soundbuffer
+		// Playback
 		if(win32State.InputRecordingIndex){
 			OutputDebugStringA("Recording...\n");
 			Win32RecordInput(&win32State, newInput);
@@ -954,6 +961,8 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 		if (GameCode.UpdateAndRender){
 			GameCode.UpdateAndRender(nullptr, &gameMemory, newInput, &back_buffer);
 		}
+
+		//Fill backbuffer and soundbuffer
 		if (GameCode.GetSoundSamples){
 			//GameCode.GetSoundSamples(nullptr, &gameMemory, &sound_buffer);
 		}	
@@ -993,5 +1002,6 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	DeleteFile(fullPath);
 	DeleteFile("game_state");
 	delete[] samples;
+	UnregisterClassA(windowClass.lpszClassName, hInstance);
 	return 0;
 }
