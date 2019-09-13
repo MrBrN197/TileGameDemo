@@ -137,6 +137,16 @@ struct vertex_buffer_3d{
 	uint32 Count;
 };
 
+struct attrib{
+	uint32 TypeSize;
+	uint32 Offset;
+};
+struct vertex_buffer_layout{
+	attrib Attributes;
+	uint32 Count;
+	uint32 Stride;
+};
+
 #define MAX_INDEX_BUFFERS 4
 #define MAX_VERTEX_BUFFERS 4
 #define MAX_RENDER_TARGET_SIZE 1 << 11  // 4096 bytes

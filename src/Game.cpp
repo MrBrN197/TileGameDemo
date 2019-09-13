@@ -35,6 +35,11 @@ internal void BoundValue(int32 &Value, int32 LowerBound, int32 UpperBound){
 	}
 }
 
+internal void ClampToBufferDimensions(game_back_buffer *buffer, int32 &X, int32 &Y){
+	BoundValue(X, 0, buffer->width - 1);
+	BoundValue(Y, 0, buffer->height - 1);
+}
+
 internal void DrawRectangle(game_back_buffer *buffer, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY, float R, float G, float B)
 {	
 	uint8 *row = (uint8 *)buffer->memory;
@@ -276,37 +281,61 @@ void DrawPoint(game_back_buffer* buffer, vec2& pos, int size){
 	DrawRectangle(buffer, pos.x - size, pos.y - size, pos.x + size, pos.y + size, 1.f, 1.f, 1.f);
 }
 
-void DrawLine(game_back_buffer* buffer, vec2& pos1, vec2 pos2, float R, float G, float B){
+void FillPixel(game_back_buffer *buffer, int32 x, int32 y, uint8 R, uint8 G, uint8 B){
+		
+	ASSERT(x <= buffer->width);
+	ASSERT(y <= buffer->height);
+	ASSERT(x >= 0);
+	ASSERT(y >= 0);
 
-	ASSERT(pos1.x >= 0);
-	ASSERT(pos1.y >= 0);
-	ASSERT(pos2.x >= 0);
-	ASSERT(pos2.y >= 0);
+	ClampToBufferDimensions(buffer, x, y);
 
-	vec2 difference = pos2 - pos1;
-	int32 dx = FloorReal32ToInt32(difference.x);
-	int32 dy = FloorReal32ToInt32(difference.y);
+	if(x == buffer->width)
+		return;
+		// x = buffer->width - 1;
+	if(y == buffer->height)
+		return;
+		// y = buffer->height - 1;
 
-	float gradient = dx/(float)dy;
+	uint32* pixel = (uint32*)(((uint8*)buffer->memory + buffer->pitch * y) + x * buffer->bytesPerPixel);
+	*pixel = 255 << 24 | R << 16 | G << 8 | B; 
+}
 
- 	uint32* row = ((uint32*)buffer->memory + buffer->width * FloorReal32ToInt32(pos1.y) + FloorReal32ToInt32(pos1.x));
-	for(uint32 y = 0; y < Abs(dy); y++){
-		uint32 lineWidth = 1;
-		for(uint32 x = 0; x < lineWidth; x++){
-			int32 r = R * 255;
-			int32 g = G * 255;
-			int32 b = B * 255;
-			*row = ((255 << 24) | (r << 16) | (g << 8) | b);
+void DrawLine(game_back_buffer* buffer, vec2 pos1, vec2 pos2, float R, float G, float B){
+
+	ASSERT(pos1.x >= 0.f);
+	ASSERT(pos1.x <= buffer->width);
+	ASSERT(pos1.y >= 0.f);
+	ASSERT(pos1.y <= buffer->height);
+
+	ASSERT(pos2.x >= 0.f);
+	ASSERT(pos2.x <= buffer->width);
+	ASSERT(pos2.y >= 0.f);
+	ASSERT(pos2.y <= buffer->height);
+
+	// Flip y coordinate
+	pos1.y = buffer->height - pos1.y; 
+	pos2.y = buffer->height - pos2.y;
+	
+	float m = (pos2.y - pos1.y)/(pos2.x - pos1.x);
+	if(Abs(m) < 1){
+		float y = pos1.y;
+		int inc = (pos2.x > pos1.x) ? 1 : -1;
+		m *= inc;
+		for (int32 x = pos1.x; x != (int)pos2.x+inc; x+=inc)
+		{
+			y += m;
+			FillPixel(buffer, x, y, R, G, B);
 		}
-		if(dy >= 0){
-			row += buffer->width;
-		}else{
-			row -= buffer->width;
-		}
-		if(dx >= 0){
-			row += (Ceil(Abs(gradient)));
-		}else{
-			row -= (Ceil(Abs(gradient)));
+	}else{
+		m = 1.f/m;
+		float x = pos1.x;
+		int32 inc = (pos2.y > pos1.y) ? 1 : -1;
+		m *= inc;
+		for (int32 y = pos1.y; y != (int)pos2.y+inc; y+=inc)
+		{
+			FillPixel(buffer, x, y, R, G, B);
+			x += m;
 		}
 	}
 }
@@ -840,9 +869,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			int32 maxx = minx + Entity->PlayerWidth * TileMap->MetresToPixels;
 			int32 maxy = miny + Entity->PlayerHeight * TileMap->MetresToPixels;
 			DrawRectangle(buffer, minx, miny, maxx, maxy, 0.85f, 0.25f, 0.3f);
-			// DrawRectangle(buffer, 0, buffer->height/2, buffer->width, buffer->height/2+1, 0.8f, 0.2, 0.3f);
-			// DrawRectangle(buffer, buffer->width/2, 0, buffer->width/2+1, buffer->height, 0.8f, 0.2, 0.3f);
-
 
 			// DrawBitmap(buffer, &GameState->BMPPixels, buffer->width/2.f - GameState->BMPPixels.Width/2, buffer->height/2.f - GameState->BMPPixels.Height/2);
 		}
@@ -866,4 +892,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	// 	NDCToScreen(buffer, vertexBuffer.Vertices[i]);
 	// }
 	DrawMesh(GameState->GraphicsContext, buffer, VertexBuffer, IndexBuffer, 36);
+
+	float hw = buffer->width/2.f;
+	float hh = buffer->height/2.f;
+	float length = 50.f;
+	DrawLine(buffer, {hw-length, hh}, {hw + length, hh}, 0.2f, 0.8f, 0.9f);
+	DrawLine(buffer, {hw, hh-length}, {hw, hh+length}, 0.2f, 0.8f, 0.9f);
 }
