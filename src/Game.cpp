@@ -158,6 +158,130 @@ DEBUGLoadBMP(thread_context *Thread, debug_platform_read_entire_file *ReadEntire
 	return Result;
 }
 
+// NOTE: Duplicate StrLen function in platform code
+uint32 StrLen(const char* str){
+	int count = 0;
+	while (*str++ != '\0')
+	{
+		count++;
+	}
+	return count;
+}
+int32 FindChar(char token, const char* string, uint32 offset = 0){
+	char currentToken; 
+	uint32 index = offset;
+	while((currentToken = string[index]) != '\0'){
+		if(currentToken == token){
+			return index;
+		} 
+		ASSERT(index < (1 << 30) - 1);
+		index++;
+	}
+	return -1;
+}
+int32 FindNotChar(char token, const char* string, uint32 offset = 0){
+	char currentToken; 
+	uint32 index = offset;
+	while((currentToken = string[index]) != '\0'){
+		if(currentToken != token){
+			return index;
+		} 
+		ASSERT(index < (1 << 30) - 1);
+		index++;
+	}
+	return -1;
+}
+
+int32 FindString(const char* token, const char* string, uint32 offset = 0){
+	uint32 index = offset;
+	uint32 tokenIndex = 0; 
+	uint32 tokenLength = StrLen(token);
+
+	char currentToken; 
+	while((currentToken = string[index]) != '\0'){
+		if(currentToken == token[0]){
+			bool found = true;
+			for(uint32 i = 1; i < tokenLength; i++){
+				if(token[i] != string[index + i]){
+					found = false;
+					break;
+				}
+			}
+			if(found){
+				return index;
+			}
+		} 
+		ASSERT(index < (1 << 30) - 1);
+		index++;
+	}
+	return -1;
+}
+
+void SubStr(char* dst, uint32 dstSize, const char* src, uint32 start, uint32 span){
+	ASSERT(span + 1 <= dstSize);
+	ASSERT(span <= StrLen(src));
+
+	for(uint32 i = 0; i < span; i++){
+		ASSERT(src[start + i] != '\0');
+		dst[i] = src[start + i];
+	}
+	dst[span] = '\0';
+}
+
+model
+DEBUGLoadOBJ(thread_context *Thread, memory_arena &arena, debug_platform_read_entire_file *ReadEntireFile, const char* path){
+	model Result;
+	debug_read_file_result FileContents = ReadEntireFile(Thread, path);
+	ASSERT(FileContents.contents);
+
+	uint32 maxVertexCount = 1024;
+	Result.VertexBuffer = PushStruct(arena, vertex_buffer_3d);
+	Result.VertexBuffer->Vertices = PushArray(arena, maxVertexCount, vec3);  // TODO: Use buffer layout structure
+	uint32 vertexCount = 0;
+
+	const char* content = (char*)FileContents.contents;
+	const char* token = "v ";
+	uint32 tokenSize = 2;
+	int32 pos = FindString(token, content);
+	while(pos != -1){
+		uint32 eol = FindChar('\n', content, pos); // TODO: search for \n or \r
+		ASSERT(eol != -1);
+		uint32 begin = pos + tokenSize;
+		uint32 span = eol - begin;
+		const uint32 maxLineSize = 200;
+		char line[maxLineSize];
+		ASSERT(span < maxLineSize);
+		SubStr(line, maxLineSize, content, begin, span);
+		ASSERT(span == StrLen(line));
+
+		int32 firstSpace = FindChar(' ', line);
+		ASSERT(firstSpace != -1);
+		int32 secondSpace = FindChar(' ', line, firstSpace+1);
+		ASSERT(secondSpace != -1);
+		char v1[16];
+		char v2[16];
+		char v3[16];
+		SubStr(v1, 16, line, 0, firstSpace);
+		SubStr(v2, 16, line, firstSpace + 1, secondSpace - (firstSpace + 1));
+		SubStr(v3, 16, line, secondSpace + 1, span - (secondSpace + 1));
+		float f1 = atof(v1);
+		float f2 = atof(v2);
+		float f3 = atof(v3);
+
+		// TODO: Use buffer layout structure
+		vec3* vertex = (vec3*)Result.VertexBuffer->Vertices + vertexCount;
+		vertex->x = f1;
+		vertex->y = f2;
+		vertex->z = f3;
+		vertexCount++;
+		ASSERT(vertexCount < maxVertexCount);
+
+		pos = FindString(token, content, eol+1);
+	}
+	Result.VertexBuffer->Count = vertexCount;
+	return Result;
+}
+
 inline void
 InitializePlayer(game_state *GameState, entity *Entity){
 	*Entity = {};
@@ -656,6 +780,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		tile_map *TileMap = PushStruct(GameState->MemoryArena, tile_map);
 		World->TileMap = TileMap;
 		GameState->BMPPixels = DEBUGLoadBMP(Thread, memory->DEBUGPlatformReadEntireFile, "./circle.bmp");
+		model Model = DEBUGLoadOBJ(Thread, GameState->MemoryArena, memory->DEBUGPlatformReadEntireFile, "./tetrahedron.obj");
 
 		TileMap->ChunkShift = 8;
 		// TODO: Generate ChunkDim And ChunkMask From ChunkShift
@@ -724,26 +849,30 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		GraphicsContext.Initialized = true;
 		*GameState->GraphicsContext = GraphicsContext;
 
-		float vertices[3 * 8] = {
-			-1.f,-1.f, 1.f,
-			 1.f,-1.f, 1.f,
-			 1.f, 1.f, 1.f,
-			-1.f, 1.f, 1.f,
-			-1.f,-1.f,-1.f, 
-			 1.f,-1.f,-1.f,
-			 1.f, 1.f,-1.f,
-			-1.f, 1.f,-1.f
-		};
-		unsigned int indices[36]{
-			0,1,2,0,2,3,
-			5,4,7,5,7,6,
-			4,0,3,4,3,7,
-			1,5,6,1,6,2,
-			3,2,6,3,6,7,
-			1,0,4,1,4,5
+		// float vertices[3 * 8] = {
+		// 	-1.f,-1.f, 1.f,
+		// 	 1.f,-1.f, 1.f,
+		// 	 1.f, 1.f, 1.f,
+		// 	-1.f, 1.f, 1.f,
+		// 	-1.f,-1.f,-1.f, 
+		// 	 1.f,-1.f,-1.f,
+		// 	 1.f, 1.f,-1.f,
+		// 	-1.f, 1.f,-1.f
+		// };
+		// unsigned int indices[36]{
+		// 	0,1,2,0,2,3,
+		// 	5,4,7,5,7,6,
+		// 	4,0,3,4,3,7,
+		// 	1,5,6,1,6,2,
+		// 	3,2,6,3,6,7,
+		// 	1,0,4,1,4,5
+		// };
+		unsigned int indices[3*4]{
+			0,2,1,0,1,3,
+			1,2,3,2,0,3
 		};
 
-		uint32 VertexBuffer = CreateVertexBuffer(GameState, sizeof(vertices), (void*)vertices);
+		uint32 VertexBuffer = CreateVertexBuffer(GameState, 4 * 3 * sizeof(float), (void*)Model.VertexBuffer->Vertices);
 		uint32 IndexBuffer = CreateIndexBuffer(GameState, sizeof(indices), (void*)indices);
 
 		memory->isInitialized = true;
@@ -891,7 +1020,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	// for (int i = 0; i < vertexBuffer.Count; i++){
 	// 	NDCToScreen(buffer, vertexBuffer.Vertices[i]);
 	// }
-	DrawMesh(GameState->GraphicsContext, buffer, VertexBuffer, IndexBuffer, 36);
+	DrawMesh(GameState->GraphicsContext, buffer, VertexBuffer, IndexBuffer, 12);
 
 	float hw = buffer->width/2.f;
 	float hh = buffer->height/2.f;

@@ -159,6 +159,10 @@ struct graphics_context{
 	void* RenderTarget;
 };
 
+struct model{
+	vertex_buffer_3d *VertexBuffer;
+};
+
 
 struct game_state {
 	world *World;
