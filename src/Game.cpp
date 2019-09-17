@@ -1,6 +1,7 @@
 
 #include "Game.h"
 #include "GameTile.cpp"
+#include "Math/Random.h"
 
 void FillSoundBuffer(int16 *samples, int32 sampleCount)
 {
@@ -179,6 +180,16 @@ int32 FindChar(char token, const char* string, uint32 offset = 0){
 	}
 	return -1;
 }
+uint32 FindCharCount(char token, const char* string, uint32 offset = 0){
+	uint32 count = 0;
+	while(offset != -1){
+		offset = FindChar(token, string, offset+1);
+		if(offset != -1){
+			count++;
+		}
+	}
+	return count;
+}
 int32 FindNotChar(char token, const char* string, uint32 offset = 0){
 	char currentToken; 
 	uint32 index = offset;
@@ -192,27 +203,46 @@ int32 FindNotChar(char token, const char* string, uint32 offset = 0){
 	return -1;
 }
 
+// Knuth–Morris–Pratt Algorithm
 int32 FindString(const char* token, const char* string, uint32 offset = 0){
-	uint32 index = offset;
-	uint32 tokenIndex = 0; 
+	uint32 const MAX_TOKEN_SIZE = 100;
 	uint32 tokenLength = StrLen(token);
+	ASSERT(tokenLength <= MAX_TOKEN_SIZE);
+	uint32 prefix[MAX_TOKEN_SIZE];
+
+	// Create prefix array
+	prefix[0] = 0;
+	uint32 j = 0;
+	for(int i = 1; i < tokenLength; i++){
+		if(token[i] == token[j]){
+			prefix[i] = prefix[i-1] + 1;
+			j++;
+		}else{
+			j = 0;
+			prefix[i] = 0;
+		}
+	}
 
 	char currentToken; 
-	while((currentToken = string[index]) != '\0'){
-		if(currentToken == token[0]){
-			bool found = true;
-			for(uint32 i = 1; i < tokenLength; i++){
-				if(token[i] != string[index + i]){
-					found = false;
-					break;
-				}
+	uint32 i = offset;
+	j = 0;
+	uint32 count = 0;
+	// uint32 stringLength = StrLen(string);
+	while(string[i] != '\0'){
+		if(token[j] == string[i]){
+			i++;
+			j++;
+			count++;
+			if(count >= tokenLength){
+				return i-tokenLength;
 			}
-			if(found){
-				return index;
-			}
-		} 
-		ASSERT(index < (1 << 30) - 1);
-		index++;
+		}else if(j != 0){
+			j = prefix[j-1];
+			count = j;
+		}else{
+			i++;
+			count = 0;
+		}
 	}
 	return -1;
 }
@@ -228,57 +258,158 @@ void SubStr(char* dst, uint32 dstSize, const char* src, uint32 start, uint32 spa
 	dst[span] = '\0';
 }
 
+#include <cstdlib>
 model
 DEBUGLoadOBJ(thread_context *Thread, memory_arena &arena, debug_platform_read_entire_file *ReadEntireFile, const char* path){
-	model Result;
+	model Result = {};
 	debug_read_file_result FileContents = ReadEntireFile(Thread, path);
 	ASSERT(FileContents.contents);
 
-	uint32 maxVertexCount = 1024;
-	Result.VertexBuffer = PushStruct(arena, vertex_buffer_3d);
-	Result.VertexBuffer->Vertices = PushArray(arena, maxVertexCount, vec3);  // TODO: Use buffer layout structure
-	uint32 vertexCount = 0;
+	uint32 maxVertexCount = 40000;
+	uint32 maxIndexCount = 40000;
+	Result.Vertices = PushArray(arena, maxVertexCount, vec3);
+	Result.Indices = PushArray(arena, maxIndexCount, uint32);
+	Result.Normals = PushArray(arena, maxIndexCount, vec3);
+	Result.TexCoords = PushArray(arena, maxIndexCount, vec2);
+	Result.VertexCount = 0;
+	Result.IndexCount = 0;
+	Result.TexCount = 0;
+	Result.NormalCount = 0;
 
 	const char* content = (char*)FileContents.contents;
 	const char* token = "v ";
 	uint32 tokenSize = 2;
+	uint32 eol;
+	uint32 begin;
+	uint32 span;
+	const uint32 maxLineSize = 200;
+	char line[maxLineSize];
+	uint32 firstSpace;
+	uint32 secondSpace;
+	char v1[16];
+	char v2[16];
+	char v3[16];
+	float f1;
+	float f2;
+	float f3;
 	int32 pos = FindString(token, content);
+	vec3* vertex = (vec3*)Result.Vertices;
 	while(pos != -1){
-		uint32 eol = FindChar('\n', content, pos); // TODO: search for \n or \r
+		eol = FindChar('\n', content, pos); // TODO: search for \n or \r
 		ASSERT(eol != -1);
-		uint32 begin = pos + tokenSize;
-		uint32 span = eol - begin;
-		const uint32 maxLineSize = 200;
-		char line[maxLineSize];
+		begin = pos + tokenSize;
+		span = eol - begin;
 		ASSERT(span < maxLineSize);
 		SubStr(line, maxLineSize, content, begin, span);
 		ASSERT(span == StrLen(line));
 
-		int32 firstSpace = FindChar(' ', line);
+		firstSpace = FindChar(' ', line);
 		ASSERT(firstSpace != -1);
-		int32 secondSpace = FindChar(' ', line, firstSpace+1);
+		secondSpace = FindChar(' ', line, firstSpace+1);
 		ASSERT(secondSpace != -1);
-		char v1[16];
-		char v2[16];
-		char v3[16];
 		SubStr(v1, 16, line, 0, firstSpace);
 		SubStr(v2, 16, line, firstSpace + 1, secondSpace - (firstSpace + 1));
 		SubStr(v3, 16, line, secondSpace + 1, span - (secondSpace + 1));
-		float f1 = atof(v1);
-		float f2 = atof(v2);
-		float f3 = atof(v3);
+		f1 = atof(v1);
+		f2 = atof(v2);
+		f3 = atof(v3);
 
 		// TODO: Use buffer layout structure
-		vec3* vertex = (vec3*)Result.VertexBuffer->Vertices + vertexCount;
 		vertex->x = f1;
 		vertex->y = f2;
 		vertex->z = f3;
-		vertexCount++;
-		ASSERT(vertexCount < maxVertexCount);
+		vertex++;
+		Result.VertexCount++;
+		ASSERT(Result.VertexCount <= maxVertexCount);
 
 		pos = FindString(token, content, eol+1);
 	}
-	Result.VertexBuffer->Count = vertexCount;
+
+	token = "f ";
+	pos = FindString(token, content);
+	while(pos != -1){
+		uint32 indices[4];
+		const uint32 maxLineSize = 200;
+		char line[maxLineSize];
+		uint32 eol = FindChar('\n', content, pos); // Note: Search For Both \r\n
+		ASSERT(eol != -1);
+		SubStr(line, maxLineSize, content, pos + tokenSize, eol - (pos + tokenSize));
+
+		if(FindChar('/', line) == -1){
+			// Format: v1 v2 v3 
+			ASSERT(false);
+		}
+		else if(FindString("//", line) != -1){
+			// Format: v1//vn1 v2//vn2 v3//vn3 
+			ASSERT(false);
+
+		}else if(FindCharCount('/', line) == 3){
+			// Format: v1/vt1 v1/vt1 v1/vt1
+			ASSERT(false);
+		}else if(FindCharCount('/', line) == 6){
+			// Format: v1/vt1/vn1 v1/vt1/vn1 v1/vt1/vn1
+
+			const uint32 groupSize = 10 * 3 + 2;
+			char faceGroup[groupSize];  // Note: Assuming maximum index value in obj file has 9 digits, size = 10*3 + 2 slashes
+
+			uint32 value;
+			uint32 divider = 0;
+			uint32 start = 0;
+			for(int i = 0; i < 3; i++){
+				divider = FindChar('/', line, start);
+				ASSERT(divider != -1);
+				SubStr(faceGroup, groupSize, line, start, divider - start);
+				start = FindChar(' ', line, divider);
+				start++;
+				value = atoi(faceGroup) - 1;
+				ASSERT(value >= 0);
+				indices[i] = value;
+			}
+			uint32* index = (uint32*)Result.Indices + Result.IndexCount;
+			for(int i =  0; i < 3; i++){
+				*index = indices[i];
+				index++;
+				Result.IndexCount++;
+				ASSERT(Result.IndexCount < maxIndexCount);
+			}
+		}else if(FindCharCount('/', line) == 8){
+			// Format: v1/vt1/vn1 v1/vt1/vn1 v1/vt1/vn1
+
+			const uint32 groupSize = 10 * 4 + 2;
+			char faceGroup[groupSize];  // Note: Assuming maximum index value in obj file has 9 digits, size = 10*4 + 2 slashes
+
+			uint32 value;
+			uint32 divider = 0;
+			uint32 start = 0;
+			for(int i = 0; i < 4; i++){
+				divider = FindChar('/', line, start);
+				ASSERT(divider != -1);
+				SubStr(faceGroup, groupSize, line, start, divider - start);
+				start = FindChar(' ', line, divider);
+				start++;
+				value = atoi(faceGroup) - 1;
+				ASSERT(value >= 0);
+				indices[i] = value;
+			}
+			uint32* index = (uint32*)Result.Indices + Result.IndexCount;
+			*index = indices[0];
+			index++;
+			*index = indices[1];
+			index++;
+			*index = indices[2];
+			index++;
+			*index = indices[0];
+			index++;
+			*index = indices[2];
+			index++;
+			*index = indices[3];
+			Result.IndexCount += 6;
+			ASSERT(Result.IndexCount < maxIndexCount);
+		}
+
+		pos = FindString(token, content, eol+1);
+	}
+
 	return Result;
 }
 
@@ -625,21 +756,6 @@ void NDCToScreen(game_back_buffer* buffer, vec3& point){
 void DrawMesh(graphics_context *GraphicsContext, game_back_buffer* Buffer, uint32 VertexBufferID, uint32 IndexBufferID, uint32 Count){
 	// TODO: Get Attributes From Layout
 
-	vec3 Colors[12] = {
-		{0.8f, 0.2f, 0.3f},	
-		{0.75f, 0.2f, 0.3f},	
-		{0.39f, 0.7f, 0.57f},
-		{0.29f, 0.6f, 0.47f},
-		{0.7f, 0.4f, 0.92f},	
-		{0.6f, 0.3f, 0.82f},	
-		{0.1f, 0.23f, 0.72f},	
-		{0.05f, 0.26f, 0.83f},
-		{0.2f, 0.2f, 0.2f},
-		{0.25f, 0.25f, 0.25f},
-		{0.93f, 0.63f, 0.23f},
-		{0.93f, 0.73f, 0.23f}
-	};
-
 	// TODO: Convert To Binding Mechanism
 	// vertex_buffer_3d* VertexBuffer = GetVertexBuffer(GraphicsContext, VertexBufferID);
 	vec3* RenderTarget = (vec3*)GraphicsContext->RenderTarget;
@@ -647,6 +763,7 @@ void DrawMesh(graphics_context *GraphicsContext, game_back_buffer* Buffer, uint3
 
 	ASSERT(Count <= IndexBuffer->Count/sizeof(uint32));
 	ASSERT(Count % 3 == 0);
+	random_state Seed = {32140342};
 	for(uint32 i = 0; i < Count/3; i++){
 		// const vec3* Point1 = (vec3*)VertexBuffer->Vertices[*(((uint32*)IndexBuffer->Indices) + (i*3+0))];
 
@@ -664,8 +781,10 @@ void DrawMesh(graphics_context *GraphicsContext, game_back_buffer* Buffer, uint3
 		NDCToScreen(Buffer, Point1);
 		NDCToScreen(Buffer, Point2);
 		NDCToScreen(Buffer, Point3);
-
-		DrawTriangle(Buffer, Point1, Point2, Point3, Colors[i]);
+		
+		vec3 Color = {RandF(&Seed), RandF(&Seed), RandF(&Seed)};
+		// vec3 Color = {0.5f, 0.4f, 0.5f};
+		DrawTriangle(Buffer, Point1, Point2, Point3, Color);
 	}
 }
 
@@ -771,6 +890,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	game_state *GameState = (game_state *)memory->permanentStorage;
 
+	static uint32 VertexBufferID;
+	static uint32 IndexBufferID;
+
 	if (!memory->isInitialized)
 	{
 		InitializeMemoryArena(GameState->MemoryArena, memory->permanentStorageSize - sizeof(GameState), (void*)((uint8*)memory->permanentStorage + sizeof(game_state)));
@@ -779,8 +901,22 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		world *World = GameState->World;
 		tile_map *TileMap = PushStruct(GameState->MemoryArena, tile_map);
 		World->TileMap = TileMap;
-		GameState->BMPPixels = DEBUGLoadBMP(Thread, memory->DEBUGPlatformReadEntireFile, "./circle.bmp");
-		model Model = DEBUGLoadOBJ(Thread, GameState->MemoryArena, memory->DEBUGPlatformReadEntireFile, "./tetrahedron.obj");
+		GameState->BMPPixels = DEBUGLoadBMP(Thread, memory->DEBUGPlatformReadEntireFile, "./bitmaps/circle.bmp");
+
+		// Graphics Context
+		graphics_context GraphicsContext = {};
+		GraphicsContext.VertexBuffers = PushArray(GameState->MemoryArena, MAX_VERTEX_BUFFERS, vertex_buffer_3d);
+		GraphicsContext.IndexBuffers = PushArray(GameState->MemoryArena, MAX_INDEX_BUFFERS, index_buffer);
+		GameState->GraphicsContext = PushStruct(GameState->MemoryArena, graphics_context);
+		GraphicsContext.RenderTarget = PushArray(GameState->MemoryArena, MAX_RENDER_TARGET_SIZE, uint8);
+		GraphicsContext.Initialized = true;
+		*GameState->GraphicsContext = GraphicsContext;
+
+		model Model = DEBUGLoadOBJ(Thread, GameState->MemoryArena, memory->DEBUGPlatformReadEntireFile, "./models/cube.obj");
+		GameState->Model = Model;
+		// TODO: Use buffer layout
+		VertexBufferID = CreateVertexBuffer(GameState, Model.VertexCount * sizeof(vec3), (void*)Model.Vertices);
+		IndexBufferID = CreateIndexBuffer(GameState, Model.IndexCount * sizeof(uint32), (void*)Model.Indices);
 
 		TileMap->ChunkShift = 8;
 		// TODO: Generate ChunkDim And ChunkMask From ChunkShift
@@ -839,16 +975,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		GameState->CameraP.AbsTileY = 3;
 		GameState->CameraP.Offset = {0.f, 0.f};
 
-		
-		// Graphics Context
-		graphics_context GraphicsContext = {};
-		GraphicsContext.VertexBuffers = PushArray(GameState->MemoryArena, MAX_VERTEX_BUFFERS, vertex_buffer_3d);
-		GraphicsContext.IndexBuffers = PushArray(GameState->MemoryArena, MAX_INDEX_BUFFERS, index_buffer);
-		GameState->GraphicsContext = PushStruct(GameState->MemoryArena, graphics_context);
-		GraphicsContext.RenderTarget = PushArray(GameState->MemoryArena, MAX_RENDER_TARGET_SIZE, uint8);
-		GraphicsContext.Initialized = true;
-		*GameState->GraphicsContext = GraphicsContext;
-
 		// float vertices[3 * 8] = {
 		// 	-1.f,-1.f, 1.f,
 		// 	 1.f,-1.f, 1.f,
@@ -867,13 +993,13 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		// 	3,2,6,3,6,7,
 		// 	1,0,4,1,4,5
 		// };
-		unsigned int indices[3*4]{
-			0,2,1,0,1,3,
-			1,2,3,2,0,3
-		};
+		// unsigned int indices[3*4]{
+		// 	0,2,1,0,1,3,
+		// 	1,2,3,2,0,3
+		// };
 
-		uint32 VertexBuffer = CreateVertexBuffer(GameState, 4 * 3 * sizeof(float), (void*)Model.VertexBuffer->Vertices);
-		uint32 IndexBuffer = CreateIndexBuffer(GameState, sizeof(indices), (void*)indices);
+		// uint32 VertexBuffer = CreateVertexBuffer(GameState, 4 * 3 * sizeof(float), (void*)Model.VertexBuffer->Vertices);
+		// uint32 IndexBuffer = CreateIndexBuffer(GameState, 36 * sizeof(uint32), (void*)Model.IndexBuffer->Indices);
 
 		memory->isInitialized = true;
 	}
@@ -1020,7 +1146,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	// for (int i = 0; i < vertexBuffer.Count; i++){
 	// 	NDCToScreen(buffer, vertexBuffer.Vertices[i]);
 	// }
-	DrawMesh(GameState->GraphicsContext, buffer, VertexBuffer, IndexBuffer, 12);
+	DrawMesh(GameState->GraphicsContext, buffer, VertexBuffer, IndexBuffer, GameState->Model.IndexCount);
 
 	float hw = buffer->width/2.f;
 	float hh = buffer->height/2.f;

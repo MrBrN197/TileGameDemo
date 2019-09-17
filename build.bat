@@ -1,6 +1,6 @@
 @echo off
 
-SET CommonCompilerFlags=/EHa /MTd /WX- /W1 /Od /Oi /FC /Fm /Gm /Gr /Zi -wd4208 -wd4189
+SET CommonCompilerFlags= /EHa /MTd /WX- /W1 /Od /Oi /FC /Fm /Gm /Gr /Zi -wd4208 -wd4189
 SET CommonLinkerFlags=/INCREMENTAL:off /OPT:REF user32.lib gdi32.lib winmm.lib
 
 
@@ -16,7 +16,7 @@ rem (x86 Build) cl %commonCompilerFlags% .\src\Win32.cpp /link -subsystem:window
 
 
 PUSHD ".\build\"
-REM rm -f *.pdb
+rm -f *.pdb
 rm -f *.obj
 echo WAITING FOR PDB > lock.tmp
 cl %CommonCompilerFlags% /LDd ..\src\Game.cpp  /link /PDB:game%random%.pdb /EXPORT:GameUpdateAndRender /EXPORT:GameGetSoundSamples user32.lib

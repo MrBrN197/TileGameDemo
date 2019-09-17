@@ -23,7 +23,11 @@ using uint8 = uint8_t;
 #define ArrayCount(X) (sizeof(X) / sizeof((X)[0]))
 // TODO: swap, min, max ... macros???
 
-#define ASSERT(X) if(!(X)) { *(int8_t*)0 = 0; }
+#ifdef DEBUG
+	#define ASSERT(X) if(!(X)) { *(int8_t*)0 = 0; }
+#else
+	#define ASSERT(x)
+#endif
 
 
 struct game_sound_buffer{
@@ -160,7 +164,14 @@ struct graphics_context{
 };
 
 struct model{
-	vertex_buffer_3d *VertexBuffer;
+	vec3* Vertices;
+	uint32* Indices;
+	vec2* TexCoords;
+	vec3* Normals;
+	uint32 IndexCount;
+	uint32 VertexCount;
+	uint32 TexCount;
+	uint32 NormalCount;
 };
 
 
@@ -169,6 +180,7 @@ struct game_state {
 	tile_map_position CameraP;
 
 	graphics_context* GraphicsContext;
+	model Model;
 
 	uint32 EnitytCameraFollowsIndex;
 	entity Entities[256];

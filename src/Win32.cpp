@@ -348,7 +348,7 @@ static void Win32RecordInput(win32_state *win32State, game_input *newInput){
 }
 
 static void Win32PlaybackInput(win32_state *win32State, game_input *newInput){
-	DWORD bytesRead;
+	DWORD bytesRead = 0;
 	ASSERT(ReadFile(win32State->PlaybackHandle, newInput, sizeof(*newInput), &bytesRead, NULL));
 	if (bytesRead == 0)
 	{
@@ -379,7 +379,7 @@ direct_sound_create* DirectSoundCreate_ = DirectSoundCreateStub;
 
 FILETIME Win32GetLastWriteTime(const char *filename)
 {
-	WIN32_FILE_ATTRIBUTE_DATA fileData;
+	WIN32_FILE_ATTRIBUTE_DATA fileData = {};
 	ASSERT(GetFileAttributesExA(filename, GetFileExInfoStandard, &fileData));
 
 	return fileData.ftLastWriteTime;
@@ -785,10 +785,10 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	}
 
 	game_memory gameMemory = {};
-	// Note: permanentStorageSize = 64MB
-	gameMemory.permanentStorageSize = Megabytes(16);
-	// Note: transientStorageSize = 4GB
-	gameMemory.transientStorageSize = Megabytes((uint64_t)64);
+	// Note: permanentStorageSize = 128MB
+	gameMemory.permanentStorageSize = Megabytes(128);
+	// Note: transientStorageSize = 2GB
+	gameMemory.transientStorageSize = Gigabytes((uint64_t)2);
 	LPVOID baseAddress = 0;
 	// TODO use LARGE_MEM_PAGES and call AdjustToken
 	win32State.gameMemoryBlock = VirtualAlloc(baseAddress, gameMemory.permanentStorageSize + gameMemory.transientStorageSize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
@@ -823,10 +823,17 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	while(Running)
 	{
 		FILETIME newDllWriteTime = Win32GetLastWriteTime(sourceDllFullPath);
+		SYSTEMTIME newSystemTime;
+		SYSTEMTIME oldSystemTime;
+		FileTimeToSystemTime(&newDllWriteTime, &newSystemTime);
+		FileTimeToSystemTime(&GameCode.lastWriteTime, &oldSystemTime);
+		GetLocalTime(&newSystemTime);
+		GetLocalTime(&oldSystemTime);
 		if (CompareFileTime(&newDllWriteTime, &GameCode.lastWriteTime) != 0)
 		{
 			Win32UnloadGameCode(&GameCode);
 			GameCode = Win32LoadGameCode(sourceDllFullPath, tempDllFullPath, lockPath);
+			GameCode.lastWriteTime = newDllWriteTime;
 		}
 
 		game_controller_input *oldKeyboardController = &oldInput->controllers[0];
