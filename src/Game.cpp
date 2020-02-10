@@ -901,7 +901,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		world *World = GameState->World;
 		tile_map *TileMap = PushStruct(GameState->MemoryArena, tile_map);
 		World->TileMap = TileMap;
-		GameState->BMPPixels = DEBUGLoadBMP(Thread, memory->DEBUGPlatformReadEntireFile, "./bitmaps/circle.bmp");
+		GameState->BMPPixels = DEBUGLoadBMP(Thread, memory->DEBUGPlatformReadEntireFile, "../data/bitmaps/circle.bmp");
 
 		// Graphics Context
 		graphics_context GraphicsContext = {};
@@ -912,7 +912,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		GraphicsContext.Initialized = true;
 		*GameState->GraphicsContext = GraphicsContext;
 
-		model Model = DEBUGLoadOBJ(Thread, GameState->MemoryArena, memory->DEBUGPlatformReadEntireFile, "./models/cube.obj");
+		model Model = DEBUGLoadOBJ(Thread, GameState->MemoryArena, memory->DEBUGPlatformReadEntireFile, "../data/models/cube.obj");
 		GameState->Model = Model;
 		// TODO: Use buffer layout
 		VertexBufferID = CreateVertexBuffer(GameState, Model.VertexCount * sizeof(vec3), (void*)Model.Vertices);

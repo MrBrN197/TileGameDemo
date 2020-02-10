@@ -734,9 +734,13 @@ int CALLBACK WinMain(HINSTANCE hInstance,
 	ASSERT(status);
 
 	RECT rect;
+	rect.left = 0;
+	rect.right = WIDTH;
+	rect.top = 0;
+	rect.bottom = HEIGHT;
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
-	int width = WIDTH + rect.right - rect.left;
-	int height = HEIGHT + rect.bottom - rect.top;
+	int width = rect.right - rect.left;
+	int height = rect.bottom - rect.top;
 
 	HWND windowHandle = CreateWindowExA(
 		NULL /* WS_EX_LAYERED */,
